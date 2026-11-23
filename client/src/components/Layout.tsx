@@ -15,6 +15,7 @@ import { useDarkMode } from '../pages/DemoShowcasePage/useDarkMode';
 import { useMachineClock } from '../pages/DemoShowcasePage/useMachineClock';
 import { getMachineModel, machinePath, supportsMode } from '../pages/DemoShowcasePage/machine-models';
 import PreviewSwitcher from './PreviewSwitcher';
+import InteractionNotes from '../demo/InteractionNotes';
 
 const directory = ['devices', 'home', 'custom-mode', 'smart-mode', 'run-control', 'settings', 'consumables', 'device-info', 'baby-items', 'other-settings', 'notifications'];
 export default function Layout() {
@@ -25,9 +26,9 @@ export default function Layout() {
   const { revision } = useDemo();
   const { locale, setLocale } = useLocale();
   const { darkMode, toggleDarkMode } = useDarkMode();
-  const [directoryOpen, setDirectoryOpen] = useState(false);
+  const [directoryOpen, setDirectoryOpen] = useState(() => window.innerWidth >= 1200);
   const [consoleOpen, setConsoleOpen] = useState(false);
-  const [infoOpen, setInfoOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(() => window.innerWidth >= 1200);
   const [connectors, setConnectors] = useState(() => demoLocal.get('connectors', true));
   const [showPhoneFrame, setShowPhoneFrame] = useState(() => demoLocal.get('show-phone-frame', true));
   const [paths, setPaths] = useState<string[]>([]);
@@ -117,6 +118,8 @@ export default function Layout() {
     const frame = requestAnimationFrame(update);
     const observer = new ResizeObserver(update);
     observer.observe(element);
+    const infoBody = element.querySelector('.info-panel .tool-body');
+    if (infoBody) observer.observe(infoBody);
     element.querySelectorAll('[data-device-frame], [data-note-target]').forEach(node => observer.observe(node));
     window.addEventListener('resize', update);
     element.addEventListener('scroll', update, true);
@@ -150,9 +153,7 @@ export default function Layout() {
       <main ref={stage} className="phone-stage" data-show-phone-frame={showPhoneFrame} style={{ '--phone-scale': phoneScale } as CSSProperties}>
         <RouteBoundary><Outlet /></RouteBoundary>
       </main>
-      {infoOpen && <aside className="tool-panel info-panel" aria-label="交互说明"><header><BookOpen size={16} /><h2>交互说明</h2><button title="关闭交互说明" aria-label="关闭交互说明" onClick={() => setInfoOpen(false)}><X size={16} /></button></header>
-        <div className="tool-body"><div className="tool-kicker">{page.title}</div>{page.notes.map((note, index) => <details key={`${page.id}:${index}`} open data-note-target={note.target}><summary><span>{index + 1}</span>{note.title}</summary><p>{note.body}</p></details>)}</div>
-      </aside>}
+      <InteractionNotes page={page} open={infoOpen} onClose={() => setInfoOpen(false)} />
     </div>
     {paths.length > 0 && <svg className="interaction-lines" aria-hidden="true">{paths.map((d, index) => <path key={index} d={d} />)}</svg>}
     {shareOpen && <dialog ref={shareDialog} className="share-dialog" aria-label="手机体验" onCancel={() => setShareOpen(false)}><header><h2>手机体验</h2><button aria-label="关闭手机体验" onClick={() => setShareOpen(false)}><X size={18} /></button></header><QRCodeSVG value={appUrl} size={192} marginSize={2} /><a href={appUrl} target="_blank" rel="noopener">{appUrl}</a></dialog>}

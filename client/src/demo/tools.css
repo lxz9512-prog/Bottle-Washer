@@ -87,3 +87,52 @@
   .workspace-header > span { display: none; }
   .workspace-grid { padding: 12px 0 24px; }
 }
+
+/* Continuous desktop rails, with the current project's palette. */
+.directory-panel, .info-panel { border: 0; border-radius: 0; box-shadow: none; }
+.directory-panel > header, .info-panel > header { border: 0; padding: 22px 22px 16px; }
+.directory-panel > header { padding-left: 18px; padding-right: 18px; gap: 6px; }
+.directory-panel h2, .info-panel h2 { font-size: 18px; }
+.directory-panel h2 { white-space: nowrap; }
+.directory-panel nav { padding: 0 14px 24px; gap: 2px; }
+.directory-panel nav button { padding: 12px 14px; border-radius: 0; border-left: 2px solid transparent; font-size: 14px; }
+.directory-panel nav button.selected { border-left-color: #17634e; }
+.info-panel .tool-body { padding: 0 24px 28px; }
+.info-panel details { border: 0; padding: 14px 0; }
+.info-panel summary { justify-content: space-between; gap: 12px; font-size: 14px; padding: 4px 0; }
+.info-panel summary::-webkit-details-marker { display: none; }
+.info-panel summary > svg { color: #75817e; flex-shrink: 0; transition: transform .15s; }
+.info-panel details[open] > summary > svg { transform: rotate(180deg); }
+.info-panel details p { margin: 10px 0 0; padding-left: 14px; border-left: 2px solid #e4e9e6; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.85; }
+.notes-toolbar { display: flex; align-items: center; gap: 8px; padding: 0 24px 16px; flex-wrap: wrap; }
+.notes-toolbar > span { color: #75817e; font-size: 13px; flex: 1; min-width: 80px; }
+.notes-toolbar button, .notes-connection button { display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 5px 8px; font-size: 13px; color: #17634e; border-radius: 4px; }
+.notes-toolbar button:disabled { opacity: .5; cursor: default; }
+.notes-message { margin: 0 0 16px; font-size: 13px; line-height: 1.7; color: #17634e; }
+.notes-message.has-error { color: #a84f2f; }
+.note-editor { padding: 10px 0 20px; }
+.note-editor label, .notes-connection label { display: block; font-size: 12px; color: #65716d; }
+.note-editor label + label { margin-top: 12px; }
+.note-editor input, .note-editor textarea, .notes-connection input { display: block; width: 100%; border: 1px solid #d7dfdc; border-radius: 4px; padding: 10px; margin-top: 6px; background: #fff; color: #222b29; font: inherit; font-size: 14px; line-height: 1.7; }
+.note-editor textarea { min-height: 170px; resize: vertical; }
+.note-editor input:focus, .note-editor textarea:focus, .notes-connection input:focus { outline: 2px solid #24816d; outline-offset: 2px; }
+.notes-connection { padding: 16px 0 22px; }
+.notes-connection p, .notes-connection a { font-size: 12px; line-height: 1.7; color: #65716d; }
+.notes-connection > div { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.notes-connection a { text-decoration: underline; }
+.notes-disconnect { font-size: 12px; color: #75817e; padding: 12px 0; }
+.info-panel .notes-comparison { font-size: 12px; }
+@media (min-width: 1200px) {
+  .workspace-grid { max-width: none; padding: 0; gap: 0; }
+  .phone-stage { padding: 26px 20px 36px; }
+  .directory-panel, .info-panel { height: calc(100vh - 60px); max-height: calc(100vh - 60px); position: sticky; top: 0; }
+  .directory-panel { border-right: 1px solid #dfe4e5; }
+  .info-panel { border-left: 1px solid #dfe4e5; }
+  .console-panel { margin: 24px 12px; }
+  .with-directory { grid-template-columns: 220px minmax(430px, 1fr); }
+  .with-info { grid-template-columns: minmax(430px, 1fr) minmax(300px, 30vw); }
+  .with-directory.with-info { grid-template-columns: 220px minmax(430px, 1fr) minmax(300px, 30vw); }
+  .with-console.with-info { grid-template-columns: 270px minmax(430px, 1fr) minmax(300px, 28vw); }
+  .with-directory.with-console { grid-template-columns: 200px 270px minmax(430px, 1fr); }
+  .with-directory.with-console.with-info { grid-template-columns: 180px 250px minmax(433px, 1fr) minmax(300px, 24vw); }
+}
