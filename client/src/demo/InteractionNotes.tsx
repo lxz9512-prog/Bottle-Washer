@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   BookOpen,
+  CheckCircle2,
+  AlertCircle,
   ChevronDown,
   Pencil,
+  Plus,
   RefreshCw,
   Save,
+  Trash2,
   X,
 } from 'lucide-react';
 import type { DemoPage } from './catalog';
@@ -81,6 +85,12 @@ export default function InteractionNotes({
   }, [page.id, open]);
 
   useEffect(() => {
+    if (!message) return;
+    const timer = window.setTimeout(() => setMessage(''), failed ? 6500 : 3000);
+    return () => window.clearTimeout(timer);
+  }, [message, failed]);
+
+  useEffect(() => {
     const id = ++sessionRequestId.current;
     if (open)
       editingSession()
@@ -152,6 +162,31 @@ export default function InteractionNotes({
       };
     });
   };
+  const addNote = () => {
+    if (!draft || busy || saving || draft.length >= 40) return;
+    setEditors((current) => ({
+      ...current,
+      [page.id]: {
+        ...current[page.id],
+        draft: [
+          ...current[page.id].draft!,
+          { title: '', body: '', target: '' },
+        ],
+      },
+    }));
+    setMessage('');
+    setFailed(false);
+  };
+  const removeNote = (index: number) => {
+    if (index < page.notes.length || busy || saving) return;
+    setEditors((current) => ({
+      ...current,
+      [page.id]: {
+        ...current[page.id],
+        draft: current[page.id].draft!.filter((_, i) => i !== index),
+      },
+    }));
+  };
   const save = async () => {
     if (!draft || busy || saving) return;
     if (!unlocked) {
@@ -202,6 +237,70 @@ export default function InteractionNotes({
       <header>
         <BookOpen size={18} />
         <h2>交互说明</h2>
+        <div className="notes-header-actions">
+          <button
+            aria-label="读取最新说明"
+            title={busy ? '正在读取说明…' : '读取最新说明'}
+            aria-busy={busy && !saving}
+            disabled={busy || saving}
+            onClick={readLatest}
+          >
+            <RefreshCw
+              size={15}
+              className={busy && !saving ? 'notes-refreshing' : undefined}
+            />
+          </button>
+          {!draft && (
+            <button disabled={busy || saving || !editor} onClick={edit}>
+              <Pencil size={15} />
+              编辑
+            </button>
+          )}
+          {draft && (
+            <>
+              <button
+                disabled={busy || saving}
+                onClick={() => {
+                  setEditors((current) => ({
+                    ...current,
+                    [page.id]: { snapshot, draft: null },
+                  }));
+                  setMessage('');
+                  setUnlocking(false);
+                  setPasswordInput('');
+                }}
+              >
+                取消
+              </button>
+              <button
+                aria-label="保存到线上"
+                disabled={busy || saving}
+                onClick={save}
+              >
+                <Save size={15} />
+                <span>
+                  {saving ? (
+                    '保存中…'
+                  ) : (
+                    <>
+                      保存<span className="notes-save-destination">到线上</span>
+                    </>
+                  )}
+                </span>
+              </button>
+            </>
+          )}
+          {message && (
+            <div
+              className={'notes-toast' + (failed ? ' has-error' : '')}
+              role={failed ? 'alert' : 'status'}
+              aria-atomic="true"
+            >
+              {failed ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+              <span>{message}</span>
+            </div>
+          )}
+        </div>
         <button
           title="关闭交互说明"
           aria-label="关闭交互说明"
@@ -210,59 +309,8 @@ export default function InteractionNotes({
           <X size={18} />
         </button>
       </header>
-      <div className="notes-toolbar">
-        <span>{page.title}</span>
-        <button
-          aria-label="读取最新说明"
-          title="读取最新说明"
-          disabled={busy || saving}
-          onClick={readLatest}
-        >
-          <RefreshCw size={15} />
-        </button>
-        {!draft && (
-          <button disabled={busy || saving || !editor} onClick={edit}>
-            <Pencil size={15} />
-            编辑
-          </button>
-        )}
-        {draft && (
-          <>
-            <button
-              disabled={busy || saving}
-              onClick={() => {
-                setEditors((current) => ({
-                  ...current,
-                  [page.id]: { snapshot, draft: null },
-                }));
-                setMessage('');
-                setUnlocking(false);
-                setPasswordInput('');
-              }}
-            >
-              取消
-            </button>
-            <button disabled={busy || saving} onClick={save}>
-              <Save size={15} />
-              {saving ? '保存中…' : '保存到线上'}
-            </button>
-          </>
-        )}
-      </div>
+      <p className="notes-page-title">{page.title}</p>
       <div className="tool-body">
-        {message && (
-          <p
-            className={`notes-message ${failed ? 'has-error' : ''}`}
-            role={failed ? 'alert' : 'status'}
-          >
-            {message}
-          </p>
-        )}
-        {busy && !draft && (
-          <p role="status" className="tool-muted">
-            正在读取线上说明…
-          </p>
-        )}
         {unlocking && (
           <form
             className="notes-connection"
@@ -327,12 +375,24 @@ export default function InteractionNotes({
               key={`${page.id}:${index}`}
               data-note-target={note.target}
             >
+              {index >= page.notes.length && (
+                <button
+                  className="note-remove"
+                  aria-label={`删除说明 ${index + 1}`}
+                  disabled={busy || saving}
+                  onClick={() => removeNote(index)}
+                >
+                  <Trash2 size={14} />
+                  删除说明
+                </button>
+              )}
               <label>
                 标题
                 <input
                   aria-label={`说明 ${index + 1} 标题`}
                   value={note.title}
                   maxLength={120}
+                  autoFocus={index >= snapshot.notes.length}
                   disabled={busy || saving}
                   onChange={(event) =>
                     update(index, 'title', event.target.value)
@@ -351,20 +411,21 @@ export default function InteractionNotes({
                   }
                 />
               </label>
-              {(snapshot.notes[index].body !== note.body ||
-                snapshot.notes[index].title !== note.title) && (
-                <details className="notes-comparison">
-                  <summary>
-                    查看线上版本
-                    <ChevronDown size={14} />
-                  </summary>
-                  <p>
-                    {snapshot.notes[index].title}
-                    {'\n'}
-                    {snapshot.notes[index].body}
-                  </p>
-                </details>
-              )}
+              {snapshot.notes[index] &&
+                (snapshot.notes[index].body !== note.body ||
+                  snapshot.notes[index].title !== note.title) && (
+                  <details className="notes-comparison">
+                    <summary>
+                      查看线上版本
+                      <ChevronDown size={14} />
+                    </summary>
+                    <p>
+                      {snapshot.notes[index].title}
+                      {'\n'}
+                      {snapshot.notes[index].body}
+                    </p>
+                  </details>
+                )}
             </section>
           ) : (
             <details
@@ -380,6 +441,16 @@ export default function InteractionNotes({
             </details>
           ),
         )}
+        {draft && (
+          <button
+            className="notes-add"
+            disabled={busy || saving || draft.length >= 40}
+            onClick={addNote}
+          >
+            <Plus size={16} />
+            {draft.length >= 40 ? '最多添加 40 项说明' : '新增说明'}
+          </button>
+        )}
         {unlocked && (
           <button
             className="notes-disconnect"
@@ -389,6 +460,7 @@ export default function InteractionNotes({
                 await lockEditing();
                 setUnlocked(false);
                 setMessage('编辑已锁定。');
+                setFailed(false);
               } catch (error) {
                 setMessage(errorMessage(error));
                 setFailed(true);

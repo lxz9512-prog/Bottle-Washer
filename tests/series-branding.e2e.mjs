@@ -69,8 +69,9 @@ try {
     comparable(sizes.bw05s, sizes.bw05p, `control ${viewport.width}`);
   }
   await page.goto(`${base}#/demo`, { waitUntil: 'domcontentloaded' });
-  await page.locator('.workspace-header strong').waitFor();
-  assert.equal(await page.locator('.workspace-header strong').innerText(), '清洗机系列');
+  await page.locator('.global-panel').waitFor();
+  assert.equal(await page.title(), '清洗机系列');
+  assert.equal(await page.locator('.workspace-header').count(), 0);
   assert.deepEqual(errors, []);
   console.log('PASS: series branding, comparable S/P artwork, centered products, consumables clearance and responsive screenshots.');
 } finally { await browser.close(); }

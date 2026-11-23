@@ -13,7 +13,15 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   const switchTo = async mode => {
     const old = await page.evaluate(() => window.__previewTestMarker = crypto.randomUUID());
-    await page.getByRole('group', { name: '预览版本', exact: true }).getByRole('button', { name: mode === 'app' ? '移动版' : 'PC 版', exact: true }).click();
+    if (mode === 'app') {
+      await page.getByRole('group', { name: '预览版本', exact: true }).getByRole('button', { name: '移动版', exact: true }).click();
+    } else {
+      // Mobile mode contains no tool UI. Open the equivalent PC entry explicitly.
+      const target = new URL(page.url());
+      target.searchParams.set('preview', 'pc');
+      target.hash = target.hash.replace(/^#\/app(?=\/|$)/, '#/demo');
+      await page.goto(target.href);
+    }
     await page.waitForFunction(({ mode, old }) => document.documentElement.dataset.experience === mode && window.__previewTestMarker !== old, { mode, old });
     await page.locator(mode === 'app' ? '[data-app-screen]' : '[data-device-frame]').waitFor();
   };
@@ -33,7 +41,8 @@ try {
     const bounds = await page.locator('[data-app-screen]').boundingBox();
     assert.equal(bounds.width, wide ? 393 : width);
     assert.equal(bounds.height, wide ? 852 : 1100);
-    assert.equal(await page.locator('.mobile-preview-header').isVisible(), wide);
+    assert.equal(await page.locator('.mobile-preview-header').count(), 0);
+    assert.equal(await page.locator('.mobile-preview-controls,.global-panel,.control-dock,.preview-controls').count(), 0);
     assert.equal(await page.locator('[data-device-frame], .device-status-bar, [data-home-indicator], .console-panel, .directory-panel, .info-panel').count(), 0);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     if (wide) assert.equal(bounds.x, (width - 393) / 2);
@@ -96,14 +105,12 @@ try {
   assert.equal(new URL(page.url()).hash, '#/app/cleaning-machine/models/bw05p/settings');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${base}#/demo`);
-  await page.locator('.workspace-header').waitFor();
+  await page.locator('.global-panel').waitFor();
+  assert.equal(await page.locator('.workspace-header').count(), 0);
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  const header = await page.locator('.workspace-header').boundingBox();
-  for (const button of await page.locator('.workspace-header button').all()) {
-    assert.ok(await button.evaluate(node => { const a = node.getBoundingClientRect(); const b = node.closest('.workspace-header').getBoundingClientRect(); return a.top >= b.top && a.bottom <= b.bottom && a.right <= innerWidth; }));
-  }
-  assert.ok(header.height < 120);
-  await page.screenshot({ path: 'tests/artifacts/preview/demo-mobile-header.png' });
+  assert.equal(await page.locator('.global-panel .preview-switcher').count(), 1);
+  assert.equal(await page.locator('.global-panel').getByRole('button', { name: '手机体验二维码' }).count(), 1);
+  await page.screenshot({ path: 'tests/artifacts/preview/demo-mobile-controls.png', fullPage: true });
   for (const size of [{ width: 375, height: 667 }, { width: 548, height: 914 }, { width: 900, height: 768 }, { width: 1366, height: 768 }]) {
     await page.setViewportSize(size);
     await page.waitForFunction(() => {
@@ -121,17 +128,19 @@ try {
       return { x: r.x, y: r.y, width: r.width, height: r.height };
     });
     const initial = await frameBounds();
+    const initialDock = await page.locator('.control-dock').boundingBox();
     assert.ok(Math.abs(initial.x + initial.width / 2 - width / 2) < 1);
     for (const [directory, info] of [[false, true], [false, false], [true, false], [true, true]]) {
       await setWorkspacePanel(page, '页面目录', directory);
       await setWorkspacePanel(page, '交互说明', info);
       assert.deepEqual(await frameBounds(), initial, 'sidebars keep the Demo position and scale');
+      assert.deepEqual(await page.locator('.control-dock').boundingBox(), initialDock, 'directory and notes toggles keep both consoles fixed');
     }
     await openGlobalTools(page);
     assert.deepEqual(await frameBounds(), initial);
     await openPageExceptions(page);
     assert.deepEqual(await frameBounds(), initial);
-    assert.equal(await page.locator('.global-panel').count(), 0);
+    assert.equal(await page.locator('.global-panel').count(), 1);
     assert.equal(await page.locator('.console-panel .tool-segments').count(), 0);
     assert.equal(await page.locator('.side-rail').first().evaluate(node => getComputedStyle(node).transitionDuration.includes('0.3s')), true);
     await page.reload();
@@ -139,5 +148,5 @@ try {
     await page.screenshot({ path: `tests/artifacts/preview/demo-desktop-${width}.png` });
   }
   assert.deepEqual(errors, []);
-  console.log('PASS: root breakpoints, resize stability, explicit entries, fixed/mobile layouts, short-window scrolling, model/page-preserving reload switches, legacy links, notifications fallback, separate stores/runtimes, browser back and header geometry.');
+  console.log('PASS: root breakpoints, resize stability, explicit entries, fixed/mobile layouts, short-window scrolling, model/page-preserving reload switches, legacy links, notifications fallback, separate stores/runtimes, browser back, full-viewport centering and console preview controls.');
 } finally { await browser.close(); }

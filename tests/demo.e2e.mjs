@@ -11,18 +11,21 @@ try {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(url);
-  await page.locator('.workspace-header').waitFor();
+  await page.locator('.global-panel').waitFor();
   assert.equal(await page.locator('.side-rail[data-open=true]').count(), 2);
   await openGlobalTools(page);
   await page.getByRole('heading', { name: '全局控制台' }).waitFor();
   await page.locator('[data-device-frame]').waitFor();
   assert.equal(await page.locator('.phone-stage [aria-label="演示工具"]').count(), 0);
-  assert.equal(await page.locator('.console-toolbar button').count(), 5);
+  assert.equal(await page.locator('.global-panel .tool-segments button').count(), 2);
+  assert.equal(await page.getByRole('button', { name: '切换深色模式', exact: true }).count(), 0);
+  assert.equal(await page.locator('.global-panel .preview-controls').count(), 1);
+  assert.equal(await page.locator('.workspace-header').count(), 0);
   await page.getByRole('switch', { name: '显示手机边框' }).uncheck();
   assert.equal(await page.locator('[data-device-chrome]:visible').count(), 0);
   await page.reload();
   await page.locator('[data-device-screen]').waitFor();
-  assert.equal(await page.locator('.global-panel').count(), 0);
+  assert.equal(await page.locator('.global-panel').count(), 1);
   await openGlobalTools(page);
   assert.equal(await page.getByRole('switch', { name: '显示手机边框' }).isChecked(), false);
   await page.getByRole('switch', { name: '显示手机边框' }).check();
@@ -33,6 +36,7 @@ try {
     await page.waitForTimeout(100);
   };
   const checkFraming = async () => {
+    await page.evaluate(() => window.scrollTo(0, 0));
     const bounds = await page.evaluate(() => {
       const frame = document.querySelector('[data-device-frame]').getBoundingClientRect();
       return {
@@ -146,14 +150,11 @@ try {
   await openPageExceptions(page);
   await page.waitForTimeout(1200);
   await page.locator('[data-model=bw05s]').waitFor();
-  await page.getByRole('button', { name: '隐藏控制台', exact: true }).click();
-  await page.getByRole('button', { name: '打开异常控制台', exact: true }).click();
-  await page.getByRole('button', { name: '折叠控制台', exact: true }).click();
-  assert.equal(await page.getByLabel('异常场景', { exact: true }).count(), 0);
-  assert.equal(await page.locator('.global-panel').count(), 0);
-  await page.getByRole('button', { name: '展开控制台', exact: true }).click();
+  assert.equal(await page.locator('.global-panel > header button, .console-panel > header button').count(), 0);
+  assert.equal(await page.getByRole('button', { name: /打开全局控制台|打开异常控制台|隐藏控制台/ }).count(), 0);
   await page.keyboard.press('Escape');
-  assert.equal(await page.locator('.console-panel').count(), 0);
+  assert.equal(await page.locator('.console-panel').count(), 1);
+  assert.equal(await page.locator('.global-panel').count(), 1);
   await page.setViewportSize({ width: 1200, height: 768 });
   await setWorkspacePanel(page, '页面目录', true);
   await setWorkspacePanel(page, '交互说明', true);
@@ -183,11 +184,12 @@ try {
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `overflow at ${width}`);
     const rect = await page.locator('[data-device-frame]').boundingBox();
     assert.ok(rect.width > 300 && rect.x >= 0 && rect.x + rect.width <= width + 1, `phone framing at ${width}: ${JSON.stringify(rect)}`);
-    await page.getByRole('button', { name: '打开异常控制台', exact: true }).click();
+    await openPageExceptions(page);
     await page.getByLabel('异常场景', { exact: true }).selectOption('devices.empty');
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: `tests/artifacts/mobile-${width}.png`, fullPage: true });
     await page.keyboard.press('Escape');
   }
   assert.deepEqual(errors, []);
-  console.log('PASS: desktop/mobile, immediate scenes, retry policies, forms, isolated resets, hide/collapse, framing, no runtime errors');
+  console.log('PASS: desktop/mobile, immediate scenes, retry policies, forms, isolated resets, persistent stacked controls, framing, no runtime errors');
 } finally { await browser.close(); }

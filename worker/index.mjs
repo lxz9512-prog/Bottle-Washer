@@ -79,7 +79,7 @@ async function readBody(request) {
     const { done, value } = await reader.read();
     if (done) break;
     length += value.length;
-    if (length > 100000) {
+    if (length > 2000000) {
       await reader.cancel();
       return null;
     }
@@ -99,7 +99,12 @@ async function readBody(request) {
 }
 
 function validNotes(value, page) {
-  if (!Array.isArray(value) || value.length !== page.notes.length) return null;
+  if (
+    !Array.isArray(value) ||
+    value.length < page.notes.length ||
+    value.length > 40
+  )
+    return null;
   const notes = [];
   for (const [index, note] of value.entries()) {
     if (
@@ -115,7 +120,7 @@ function validNotes(value, page) {
     notes.push({
       title: note.title.trim(),
       body: note.body.trim(),
-      target: page.notes[index].target,
+      target: page.notes[index]?.target ?? '',
     });
   }
   return notes;

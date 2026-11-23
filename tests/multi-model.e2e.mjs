@@ -183,7 +183,7 @@ try {
   for (const id of ['bw05p', 'bw05a', 'bw05s']) {
     await go(id, 'home', 'demo');
     await setWorkspacePanel(page, '页面目录', true);
-    if (!await page.locator('.console-panel').isVisible()) await page.getByRole('button', { name: '打开异常控制台', exact: true }).click();
+    await page.locator('.console-panel > header').scrollIntoViewIfNeeded();
     await page.locator('.directory-panel').waitFor();
     assert.equal(await page.locator('.directory-panel').getByRole('button', { name: '智能模式运行', exact: true }).count(), id === 'bw05s' ? 1 : 0);
     assert.equal(await page.getByLabel('设备设计状态').locator('option[value="filter-soon"]').count(), id === 'bw05a' ? 0 : 1);

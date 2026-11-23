@@ -45,6 +45,17 @@ test('cloud editing authenticates, persists and rejects stale or invalid writes'
     const second = await (await request(endpoint, 'PUT', revised, cookie)).json();
     assert.notEqual(second.revision, saved.revision);
     assert.equal((await request(endpoint, 'PUT', revised, cookie)).status, 409, 'stale UPDATE cannot overwrite');
+    const addition = { title: '新增交互标题', body: '新增交互正文', target: 'untrusted' };
+    const addedResponse = await request(endpoint, 'PUT', { notes: [...second.notes, addition], revision: second.revision }, cookie);
+    assert.equal(addedResponse.status, 200);
+    const added = await addedResponse.json();
+    assert.deepEqual(added.notes.at(-1), { ...addition, target: '' });
+    assert.deepEqual(await (await request(endpoint)).json(), added, 'new reader sees added title and body');
+    assert.equal((await request(endpoint, 'PUT', { notes: [...added.notes, { ...addition, body: ' ' }], revision: added.revision }, cookie)).status, 400);
+    assert.equal((await request(endpoint, 'PUT', { notes: Array.from({length:41},()=>addition), revision: added.revision }, cookie)).status, 400);
+    const removed = await request(endpoint, 'PUT', { notes: second.notes, revision: added.revision }, cookie);
+    assert.equal(removed.status, 200, 'added notes can be removed while original notes remain');
+    assert.deepEqual((await removed.json()).notes, second.notes);
     const forged = cookie.slice(0, -1) + (cookie.endsWith('0') ? '1' : '0');
     assert.equal((await request(endpoint, 'PUT', { ...update, revision: second.revision }, forged)).status, 401);
     const logout = await request('/api/notes/session', 'DELETE', undefined, cookie);

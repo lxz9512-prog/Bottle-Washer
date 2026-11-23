@@ -19,6 +19,13 @@ try {
     await setWorkspacePanel(page, '页面目录', true);
     await page.locator('.directory-panel').getByRole('button', { name: title, exact: true }).click();
     await page.waitForTimeout(150);
+    await page.evaluate(() => window.scrollTo(0,0));
+  };
+  const setTheme = async dark => {
+    await go('其他设置');
+    const current=await page.evaluate(()=>JSON.parse(localStorage.getItem('BW05S_demo_v1:preferences')??'{}').darkMode===true);
+    if(current!==dark)await page.locator('[data-device-screen] button').filter({has:page.locator('svg.lucide-moon')}).click();
+    await page.evaluate(()=>window.scrollTo(0,0));
   };
   const consoleOpen = async () => {
     await openGlobalTools(page);
@@ -90,8 +97,7 @@ try {
     await page.waitForTimeout(200);
     for (const dark of [false, true]) {
       await consoleOpen();
-      const theme = page.getByRole('button', { name: '切换深色模式', exact: true });
-      if ((await theme.getAttribute('aria-pressed') === 'true') !== dark) await theme.click();
+      await setTheme(dark);
       for (const frame of [true, false]) {
         await consoleOpen();
         await page.getByRole('switch', { name: '显示手机边框' }).setChecked(frame);
@@ -121,7 +127,7 @@ try {
   await page.waitForTimeout(200);
   await consoleOpen();
   await page.getByRole('switch', { name: '显示手机边框' }).check();
-  if (await page.getByRole('button', { name: '切换深色模式', exact: true }).getAttribute('aria-pressed') === 'true') await page.getByRole('button', { name: '切换深色模式', exact: true }).click();
+  await setTheme(false);
   await go('模式选择');
   await page.locator('[data-device-screen]').getByRole('button', { name: /Breast Pump|吸奶器/ }).first().click();
   await page.waitForTimeout(400);

@@ -55,3 +55,22 @@ test('validates content before network writes', async t => {
   await assert.rejects(saveNotes(page, [{ ...page.notes[0], body: ' ' }], null));
   assert.equal(mock.mock.callCount(), 0);
 });
+
+test('additional notes round-trip with no arbitrary connector targets', async t => {
+  const notes = [...page.notes, { title: '新增标题', body: '新增正文\n第二行', target: 'untrusted' }];
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    const body = JSON.parse(init.body);
+    assert.equal(body.notes[1].target, '');
+    return response(200, { ...body, revision: 'added' });
+  });
+  const saved = await saveNotes(page, notes, 'current');
+  assert.equal(saved.notes.length, 2);
+  assert.deepEqual(saved.notes[1], { title: '新增标题', body: '新增正文\n第二行', target: '' });
+});
+
+test('rejects missing original notes and excessive additions before writing', async t => {
+  const mock = t.mock.method(globalThis, 'fetch', async () => { throw new Error('Must not request'); });
+  await assert.rejects(saveNotes(page, [], null));
+  await assert.rejects(saveNotes(page, Array.from({length:41},()=>page.notes[0]), null));
+  assert.equal(mock.mock.callCount(), 0);
+});

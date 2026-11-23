@@ -34,7 +34,11 @@ async function request(path: string, init: RequestInit = {}) {
 }
 
 function validateNotes(value: unknown, page: DemoPage): InteractionNote[] {
-  if (!Array.isArray(value) || value.length !== page.notes.length)
+  if (
+    !Array.isArray(value) ||
+    value.length < page.notes.length ||
+    value.length > 40
+  )
     throw new NotesError('线上说明格式不兼容，原有内容已保留。');
   return value.map((note, index) => {
     if (
@@ -53,7 +57,7 @@ function validateNotes(value: unknown, page: DemoPage): InteractionNote[] {
     return {
       title: note.title.trim(),
       body: note.body.trim(),
-      target: page.notes[index].target,
+      target: page.notes[index]?.target ?? '',
     };
   });
 }
