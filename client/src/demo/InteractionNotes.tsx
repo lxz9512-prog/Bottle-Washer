@@ -10,6 +10,9 @@ import {
 import type { DemoPage } from './catalog';
 import {
   loadNotes,
+  editingSession,
+  unlockEditing,
+  lockEditing,
   NotesError,
   saveNotes,
   type InteractionNote,
@@ -31,16 +34,17 @@ export default function InteractionNotes({
   onClose: () => void;
 }) {
   const [editors, setEditors] = useState<Record<string, PageEditor>>({});
-  const [token, setToken] = useState('');
-  const [connecting, setConnecting] = useState(false);
-  const [tokenInput, setTokenInput] = useState('');
+  const [unlocked, setUnlocked] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [savingPages, setSavingPages] = useState<Set<string>>(() => new Set());
   const [message, setMessage] = useState('');
   const [failed, setFailed] = useState(false);
   const requestId = useRef(0);
+  const sessionRequestId = useRef(0);
   const editor = editors[page.id];
-  const snapshot = editor?.snapshot ?? { notes: page.notes, sha: null };
+  const snapshot = editor?.snapshot ?? { notes: page.notes, revision: null };
   const draft = editor?.draft;
   const notes = draft ?? snapshot.notes;
   const saving = savingPages.has(page.id);
@@ -48,13 +52,13 @@ export default function InteractionNotes({
   useEffect(() => {
     setMessage('');
     setFailed(false);
-    setConnecting(false);
-    setTokenInput('');
+    setUnlocking(false);
+    setPasswordInput('');
     setBusy(false);
     const id = ++requestId.current;
     if (!open || editor) return;
     setBusy(true);
-    loadNotes(page, token)
+    loadNotes(page)
       .then((value) => {
         if (id === requestId.current)
           setEditors((current) => ({
@@ -76,12 +80,27 @@ export default function InteractionNotes({
     };
   }, [page.id, open]);
 
+  useEffect(() => {
+    const id = ++sessionRequestId.current;
+    if (open)
+      editingSession()
+        .then((value) => {
+          if (id === sessionRequestId.current) setUnlocked(value);
+        })
+        .catch(() => {
+          if (id === sessionRequestId.current) setUnlocked(false);
+        });
+    return () => {
+      sessionRequestId.current++;
+    };
+  }, [open]);
+
   const readLatest = async () => {
     const id = ++requestId.current;
     setBusy(true);
     setMessage('');
     try {
-      const latest = await loadNotes(page, token);
+      const latest = await loadNotes(page);
       if (id !== requestId.current) return;
       setEditors((current) => ({
         ...current,
@@ -103,6 +122,13 @@ export default function InteractionNotes({
     }
   };
   const edit = () => {
+    if (!unlocked) {
+      setUnlocking(true);
+      return;
+    }
+    startDraft();
+  };
+  const startDraft = () => {
     setEditors((current) => ({
       ...current,
       [page.id]: {
@@ -128,8 +154,8 @@ export default function InteractionNotes({
   };
   const save = async () => {
     if (!draft || busy || saving) return;
-    if (!token) {
-      setConnecting(true);
+    if (!unlocked) {
+      setUnlocking(true);
       return;
     }
     const id = ++requestId.current;
@@ -137,7 +163,7 @@ export default function InteractionNotes({
     setSavingPages((current) => new Set(current).add(page.id));
     setMessage('');
     try {
-      const saved = await saveNotes(page, draft, snapshot.sha, token);
+      const saved = await saveNotes(page, draft, snapshot.revision);
       // Keep the saved result even if the reader changes page while the request runs.
       setEditors((current) => ({
         ...current,
@@ -151,6 +177,10 @@ export default function InteractionNotes({
       if (id === requestId.current) {
         setMessage(errorMessage(error));
         setFailed(true);
+        if (error instanceof NotesError && error.status === 401) {
+          setUnlocked(false);
+          setUnlocking(true);
+        }
       }
     } finally {
       setSavingPages((current) => {
@@ -206,8 +236,8 @@ export default function InteractionNotes({
                   [page.id]: { snapshot, draft: null },
                 }));
                 setMessage('');
-                setConnecting(false);
-                setTokenInput('');
+                setUnlocking(false);
+                setPasswordInput('');
               }}
             >
               取消
@@ -233,49 +263,61 @@ export default function InteractionNotes({
             正在读取线上说明…
           </p>
         )}
-        {connecting && (
+        {unlocking && (
           <form
             className="notes-connection"
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault();
-              setToken(tokenInput.trim());
-              setTokenInput('');
-              setConnecting(false);
-              setMessage('已连接，请点击“保存到线上”。');
+              const id = ++requestId.current;
+              setBusy(true);
+              setMessage('');
+              try {
+                sessionRequestId.current++;
+                await unlockEditing(passwordInput);
+                setUnlocked(true);
+                if (id === requestId.current) {
+                  setPasswordInput('');
+                  setUnlocking(false);
+                  setFailed(false);
+                  if (!draft) startDraft();
+                  setMessage('已解锁编辑。');
+                }
+              } catch (error) {
+                if (id === requestId.current) {
+                  setMessage(errorMessage(error));
+                  setFailed(true);
+                }
+              } finally {
+                if (id === requestId.current) setBusy(false);
+              }
             }}
           >
-            <label htmlFor="notes-token">GitHub 保存凭据</label>
-            <p>
-              使用可访问 Bottle-Washer 仓库且具备 Contents 读写权限的
-              fine-grained token。凭据仅在当前页面有效。
-            </p>
+            <label htmlFor="notes-password">编辑密码</label>
+            <p>输入编辑密码解锁，修改后点击保存即可同步到线上。</p>
             <input
-              id="notes-token"
+              id="notes-password"
               type="password"
-              autoComplete="off"
+              autoComplete="current-password"
               required
-              value={tokenInput}
-              onChange={(event) => setTokenInput(event.target.value)}
+              maxLength={200}
+              disabled={busy}
+              value={passwordInput}
+              onChange={(event) => setPasswordInput(event.target.value)}
             />
             <div>
               <button
                 type="button"
                 onClick={() => {
-                  setConnecting(false);
-                  setTokenInput('');
+                  setUnlocking(false);
+                  setPasswordInput('');
                 }}
               >
                 取消
               </button>
-              <button type="submit">连接</button>
+              <button type="submit" disabled={busy}>
+                {busy ? '解锁中…' : '解锁编辑'}
+              </button>
             </div>
-            <a
-              href="https://github.com/settings/personal-access-tokens/new"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              创建 GitHub 凭据
-            </a>
           </form>
         )}
         {notes.map((note, index) =>
@@ -338,15 +380,22 @@ export default function InteractionNotes({
             </details>
           ),
         )}
-        {token && (
+        {unlocked && (
           <button
             className="notes-disconnect"
-            onClick={() => {
-              setToken('');
-              setMessage('已断开 GitHub 保存连接。');
+            onClick={async () => {
+              try {
+                sessionRequestId.current++;
+                await lockEditing();
+                setUnlocked(false);
+                setMessage('编辑已锁定。');
+              } catch (error) {
+                setMessage(errorMessage(error));
+                setFailed(true);
+              }
             }}
           >
-            断开保存连接
+            锁定编辑
           </button>
         )}
       </div>

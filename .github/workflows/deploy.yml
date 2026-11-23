@@ -1,24 +1,20 @@
-name: Deploy Cleaning Machine Series
+name: Check Bottle-Washer
 
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: checks-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,60 +25,5 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run type:check:client
       - run: npm run test:demo
+      - run: npm run test:worker
       - run: npm run build
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
-      - name: Verify public site
-        env:
-          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
-        run: |
-          node --input-type=module <<'NODE'
-          import assert from 'node:assert/strict';
-          const base = process.env.PAGE_URL;
-          async function read(path) {
-            const url = new URL(path, base);
-            let failure;
-            for (let attempt = 0; attempt < 6; attempt++) {
-              try {
-                const response = await fetch(url, { signal: AbortSignal.timeout(20000) });
-                assert.equal(response.status, 200, `${url}: HTTP ${response.status}`);
-                const body = await response.text();
-                assert.ok(body.length > 0, `${url}: empty response`);
-                console.log(`PASS ${url}`);
-                return body;
-              } catch (error) {
-                failure = error;
-                await new Promise(resolve => setTimeout(resolve, 5000));
-              }
-            }
-            throw failure;
-          }
-          const html = await read('./');
-          const assets = [...html.matchAll(/(?:src|href)="(\.\/assets\/[^\"]+)"/g)].map(match => match[1]);
-          assert.ok(assets.some(path => path.endsWith('.js')), 'Missing application script');
-          assert.ok(assets.some(path => path.endsWith('.css')), 'Missing stylesheet');
-          const manifest = JSON.parse(await read('manifest.webmanifest'));
-          assert.equal(manifest.name, '清洗机系列');
-          assert.equal(manifest.short_name, '清洗机系列');
-          assert.equal(manifest.start_url, './#/app');
-          assert.equal(manifest.display, 'standalone');
-          for (const path of [...new Set([...assets, ...manifest.icons.map(icon => icon.src), 'apple-touch-icon.png', 'sw.js'])]) {
-            await read(path);
-          }
-          NODE
-      - name: Install browser for live checks
-        run: npx playwright install --with-deps chrome
-      - name: Verify live app and offline PWA
-        env:
-          APP_URL: ${{ steps.deployment.outputs.page_url }}
-          PWA_TEST: '1'
-        run: npm run test:app:e2e
-      - name: Verify live branding and product scale
-        env:
-          APP_URL: ${{ steps.deployment.outputs.page_url }}
-        run: node tests/series-branding.e2e.mjs

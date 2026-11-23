@@ -33,18 +33,19 @@ npm run dev -- --host 0.0.0.0
 
 ## PWA 与发布
 
-生产构建包含 Web App Manifest、应用图标和离线缓存。部署到 HTTPS 静态托管后，手机可通过浏览器「添加到主屏幕」以独立窗口打开；不需要 App Store、开发者证书或安装包。首次联网打开并完成缓存后，可离线重新访问。新版本等待旧页面关闭后启用，不中断正在体验的流程。
+生产构建包含 Web App Manifest、应用图标和离线缓存。部署到 HTTPS 托管后，手机可通过浏览器「添加到主屏幕」以独立窗口打开；不需要 App Store、开发者证书或安装包。首次联网打开并完成缓存后，可离线重新访问。新版本等待旧页面关闭后启用，不中断正在体验的流程。
 
 局域网 HTTP 仅用于浏览器预览，不能代替 HTTPS 的安装和离线能力。`localhost` 可用于电脑上的 PWA 验证。所有操作仍为模拟，不连接真实清洗机。
 
-部署产物为 `dist/`，支持 GitHub Pages、Cloudflare Pages、Vercel 等静态托管。`.github/workflows/deploy.yml` 在 `main` 分支推送时自动构建并发布 GitHub Pages，也支持手动触发。仓库已按所有者授权改为公开。
+项目托管于独立 Cloudflare Worker **bottle-washer**（项目名称 Bottle-Washer），静态产物为 `dist/`，交互说明由同域 API 和专属 D1 数据库保存。GitHub 继续保存源代码，推送 `main` 只执行检查，不再生成 GitHub Pages 页面。原 Pages 项目保留，新的访问入口如下：
 
 - Git 仓库：https://github.com/lxz9512-prog/Bottle-Washer
-- 桌面演示：https://lxz9512-prog.github.io/Bottle-Washer/#/demo
-- 手机体验：https://lxz9512-prog.github.io/Bottle-Washer/#/app
+- 桌面演示：https://bottle-washer.lxz9512-prog.workers.dev/#/demo
+- 手机体验：https://bottle-washer.lxz9512-prog.workers.dev/#/app
 
-仓库改名为 `Bottle-Washer`。型号标识与历史存储命名空间保持兼容；旧 GitHub Pages 路径不保证重定向，请使用以上新入口。
+PC 交互说明点击“编辑”，输入编辑密码即可解锁并保存到线上。编辑会话有效期 12 小时，点击“锁定编辑”可退出。同页并发修改会提示冲突并保留草稿，不会直接覆盖他人的更新。离线可继续体验已缓存 Demo，说明读写需要联网。
 
+Cloudflare 资源配置及维护见 [Cloudflare 部署说明](docs/cloudflare.md)。发布需收到明确指令后执行 `npm run deploy:cloudflare`。
 ```sh
 npm run build
 npm run preview
@@ -90,4 +91,4 @@ npm run test:app:e2e
 - `tests/engine.test.mjs`：场景和恢复规则测试。
 - `tests/demo.e2e.mjs`：桌面与 375/390/430 像素窄屏浏览器回归，截图输出到忽略版本控制的 `tests/artifacts/`。
 
-异常和网络均为前端模拟，不连接真实设备、账户、云接口或系统权限。当前体验页面引用的产品图、背景、监控预览与模式图标均随项目打包，不依赖远程图片。
+异常和网络均为前端模拟，不连接真实设备、账户或系统权限，交互说明读写使用项目自己的云接口。当前体验页面引用的产品图、背景、监控预览与模式图标均随项目打包，不依赖远程图片。

@@ -47,5 +47,5 @@ export default defineConfig(({ command }) => ({
       : ''),
   },
   build: { outDir: '../dist', emptyOutDir: true },
-  server: { port: 5173, host: '127.0.0.1' },
+  server: { port: 5173, host: '127.0.0.1', proxy: { '/api/notes': { target: 'http://127.0.0.1:8787', changeOrigin: false } } },
 }));

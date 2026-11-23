@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bottle-washer",
+  "account_id": "9eb5f8faaa0609883f9a24c9642fc501",
+  "main": "worker/index.mjs",
+  "compatibility_date": "2026-02-01",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "Bottle-Washer-notes",
+    "database_id": "b5141219-dfb8-4c27-9e83-5e2d54de2058",
+    "migrations_dir": "worker/migrations"
+  }]
+}
