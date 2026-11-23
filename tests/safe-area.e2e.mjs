@@ -1,3 +1,4 @@
+import { openGlobalTools, setWorkspacePanel } from './workspace-controls.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
@@ -12,15 +13,15 @@ try {
   const page = await browser.newPage({ viewport: { width: 1512, height: 1100 } });
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(process.env.DEMO_URL ?? 'http://127.0.0.1:5173/#/demo');
-  await page.getByRole('button', { name: '打开异常控制台', exact: true }).click();
+  await openGlobalTools(page);
   await page.locator('.console-toolbar').waitFor();
   const go = async title => {
-    if (!await page.locator('.directory-panel').isVisible()) await page.getByRole('button', { name: '页面目录', exact: true }).click();
+    await setWorkspacePanel(page, '页面目录', true);
     await page.locator('.directory-panel').getByRole('button', { name: title, exact: true }).click();
     await page.waitForTimeout(150);
   };
   const consoleOpen = async () => {
-    if (!await page.locator('.console-panel').isVisible()) await page.getByRole('button', { name: '打开异常控制台', exact: true }).click();
+    await openGlobalTools(page);
   };
   const inspect = async (name, capture = false) => {
     const screen = page.locator('[data-device-screen]');

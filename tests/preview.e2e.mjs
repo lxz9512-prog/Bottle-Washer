@@ -1,3 +1,4 @@
+import { openGlobalTools, openPageExceptions, setWorkspacePanel } from './workspace-controls.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
@@ -115,17 +116,26 @@ try {
     await page.goto(`${base}#/demo`);
     await page.reload();
     await page.locator('[data-device-frame]').waitFor();
-    assert.equal(await page.locator('.tool-panel').count(), 0, `panels initially collapsed at ${width}`);
-    for (const name of ['页面目录', '打开异常控制台', '交互说明']) {
-      const button = page.getByRole('button', { name, exact: true });
-      assert.equal(await button.getAttribute('aria-pressed'), 'false');
-      await button.click();
-      assert.equal(await button.getAttribute('aria-pressed'), 'true');
+    const frameBounds = () => page.locator('[data-device-frame]').evaluate(node => {
+      const r = node.getBoundingClientRect();
+      return { x: r.x, y: r.y, width: r.width, height: r.height };
+    });
+    const initial = await frameBounds();
+    assert.ok(Math.abs(initial.x + initial.width / 2 - width / 2) < 1);
+    for (const [directory, info] of [[false, true], [false, false], [true, false], [true, true]]) {
+      await setWorkspacePanel(page, '页面目录', directory);
+      await setWorkspacePanel(page, '交互说明', info);
+      assert.deepEqual(await frameBounds(), initial, 'sidebars keep the Demo position and scale');
     }
-    assert.equal(await page.locator('.tool-panel').count(), 3, `all panels can be manually opened at ${width}`);
+    await openGlobalTools(page);
+    assert.deepEqual(await frameBounds(), initial);
+    await openPageExceptions(page);
+    assert.deepEqual(await frameBounds(), initial);
+    assert.equal(await page.locator('.global-panel').count(), 0);
+    assert.equal(await page.locator('.console-panel .tool-segments').count(), 0);
+    assert.equal(await page.locator('.side-rail').first().evaluate(node => getComputedStyle(node).transitionDuration.includes('0.3s')), true);
     await page.reload();
     await page.locator('[data-device-frame]').waitFor();
-    assert.equal(await page.locator('.tool-panel').count(), 0, `refresh collapses panels at ${width}`);
     await page.screenshot({ path: `tests/artifacts/preview/demo-desktop-${width}.png` });
   }
   assert.deepEqual(errors, []);

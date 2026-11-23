@@ -52,7 +52,7 @@ export default function InteractionNotes({
     setTokenInput('');
     setBusy(false);
     const id = ++requestId.current;
-    if (!open || editor?.draft) return;
+    if (!open || editor) return;
     setBusy(true);
     loadNotes(page, token)
       .then((value) => {
@@ -163,8 +163,10 @@ export default function InteractionNotes({
   };
   return (
     <aside
-      hidden={!open}
-      className="tool-panel info-panel"
+      inert={!open}
+      aria-hidden={!open}
+      data-open={open}
+      className="tool-panel side-rail info-panel"
       aria-label="交互说明"
     >
       <header>

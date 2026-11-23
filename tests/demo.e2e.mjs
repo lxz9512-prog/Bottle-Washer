@@ -1,3 +1,4 @@
+import { openGlobalTools, openPageExceptions, setWorkspacePanel } from './workspace-controls.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
@@ -11,9 +12,9 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(url);
   await page.locator('.workspace-header').waitFor();
-  assert.equal(await page.locator('.tool-panel').count(), 0, 'desktop panels start collapsed');
-  await page.getByRole('button', { name: '打开异常控制台', exact: true }).click();
-  await page.getByRole('heading', { name: '异常控制台' }).waitFor();
+  assert.equal(await page.locator('.side-rail[data-open=true]').count(), 2);
+  await openGlobalTools(page);
+  await page.getByRole('heading', { name: '全局控制台' }).waitFor();
   await page.locator('[data-device-frame]').waitFor();
   assert.equal(await page.locator('.phone-stage [aria-label="演示工具"]').count(), 0);
   assert.equal(await page.locator('.console-toolbar button').count(), 5);
@@ -21,13 +22,13 @@ try {
   assert.equal(await page.locator('[data-device-chrome]:visible').count(), 0);
   await page.reload();
   await page.locator('[data-device-screen]').waitFor();
-  assert.equal(await page.locator('.tool-panel').count(), 0, 'refresh collapses panels again');
-  await page.getByRole('button', { name: '打开异常控制台', exact: true }).click();
+  assert.equal(await page.locator('.global-panel').count(), 0);
+  await openGlobalTools(page);
   assert.equal(await page.getByRole('switch', { name: '显示手机边框' }).isChecked(), false);
   await page.getByRole('switch', { name: '显示手机边框' }).check();
   assert.equal(await page.locator('[data-device-chrome]:visible').count(), 5);
   const go = async title => {
-    if (!await page.locator('.directory-panel').isVisible()) await page.getByRole('button', { name: '页面目录', exact: true }).click();
+    await setWorkspacePanel(page, '页面目录', true);
     await page.locator('.directory-panel').getByRole('button', { name: title, exact: true }).click();
     await page.waitForTimeout(100);
   };
@@ -47,7 +48,7 @@ try {
     assert.ok(bounds.frame.y >= 0 && bounds.frame.bottom <= bounds.height + 1, JSON.stringify(bounds));
     assert.equal(bounds.scrollY, 0, JSON.stringify(bounds));
   };
-  await page.getByRole('tab', { name: '全局环境', exact: true }).click();
+  await openPageExceptions(page);
   await page.getByLabel('异常场景', { exact: true }).selectOption('global.offline');
   await page.locator('[data-operation-state]').getByText('模拟网络不可用，本次操作未提交。').waitFor();
   await page.getByLabel('异常场景', { exact: true }).selectOption('global.weak');
@@ -59,7 +60,7 @@ try {
   await page.getByLabel('异常场景', { exact: true }).selectOption('global.weak');
   await page.locator('.console-panel').getByRole('button', { name: '恢复连接', exact: true }).click();
   await page.locator('[data-model=bw05s]').waitFor();
-  await page.getByRole('tab', { name: '本页场景', exact: true }).click();
+
   await page.getByLabel('异常场景', { exact: true }).selectOption('devices.failure');
   await page.locator('[data-operation-state]').getByText('暂时无法获取设备列表').waitFor();
   await page.getByLabel('重试结果').selectOption('failure');
@@ -133,26 +134,30 @@ try {
   await page.locator('.console-panel').getByRole('button', { name: '重置当前环节', exact: true }).click();
   assert.equal(await page.evaluate(() => localStorage.getItem('BW05S_demo_v1:items')), null);
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('BW05S_demo_v1:device-name'))), 'BW05S Test');
-  await page.locator('.console-panel').getByRole('button', { name: '重置整个 Demo', exact: true }).click();
+  await openGlobalTools(page);
+  await page.getByRole('button', { name: '重置整个 Demo', exact: true }).click();
+  await openPageExceptions(page);
   await page.locator('[data-model=bw05s]').waitFor();
   assert.equal(await page.evaluate(() => localStorage.getItem('BW05S_demo_v1:device-name')), null);
   assert.equal(await page.evaluate(() => localStorage.getItem('unrelated-test')), 'keep');
   await page.getByLabel('异常场景', { exact: true }).selectOption('devices.loading');
-  await page.locator('.console-panel').getByRole('button', { name: '重置整个 Demo', exact: true }).click();
+  await openGlobalTools(page);
+  await page.getByRole('button', { name: '重置整个 Demo', exact: true }).click();
+  await openPageExceptions(page);
   await page.waitForTimeout(1200);
   await page.locator('[data-model=bw05s]').waitFor();
   await page.getByRole('button', { name: '隐藏控制台', exact: true }).click();
   await page.getByRole('button', { name: '打开异常控制台', exact: true }).click();
   await page.getByRole('button', { name: '折叠控制台', exact: true }).click();
   assert.equal(await page.getByLabel('异常场景', { exact: true }).count(), 0);
-  assert.equal(await page.locator('.console-toolbar').isVisible(), true);
+  assert.equal(await page.locator('.global-panel').count(), 0);
   await page.getByRole('button', { name: '展开控制台', exact: true }).click();
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('.console-panel').count(), 0);
   await page.setViewportSize({ width: 1200, height: 768 });
-  for (const name of ['页面目录', '打开异常控制台', '交互说明']) {
-    await page.getByRole('button', { name, exact: true }).click();
-  }
+  await setWorkspacePanel(page, '页面目录', true);
+  await setWorkspacePanel(page, '交互说明', true);
+  await openPageExceptions(page);
   await checkFraming();
   for (const title of ['设备列表', '模式选择', '自定义模式', '智能模式运行', '运行控制', '设备设置', '设备信息', '宝宝物品', '其他设置', '系统通知']) {
     await go(title);
@@ -160,11 +165,10 @@ try {
   }
   await page.setViewportSize({ width: 1199, height: 768 });
   await page.waitForTimeout(100);
-  assert.equal(await page.locator('.tool-panel').count(), 0, 'resize must close desktop panels');
-  for (const name of ['页面目录', '打开异常控制台', '交互说明']) {
-    await page.getByRole('button', { name, exact: true }).click();
-    assert.equal(await page.locator('.tool-panel').count(), 1, 'compact panels must be mutually exclusive');
-  }
+  assert.equal(await page.locator('.side-rail[data-open=true]').count(), 0);
+  await setWorkspacePanel(page, '页面目录', true);
+  await setWorkspacePanel(page, '交互说明', true);
+  await openPageExceptions(page);
   await page.keyboard.press('Escape');
   for (const size of [{ width: 375, height: 667 }, { width: 548, height: 914 }, { width: 900, height: 768 }, { width: 1366, height: 768 }]) {
     await page.setViewportSize(size);
