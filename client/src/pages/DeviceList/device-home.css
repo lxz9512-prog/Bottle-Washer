@@ -31,7 +31,12 @@
 .device-home .monitor-heading > svg { color: #b8a5e8; }
 .device-home .monitor-preview-frame { width: 100%; aspect-ratio: 16/9; overflow: hidden; border-radius: 14px; background: #e4dfef; }
 .device-home .monitor-preview { display: block; width: 100%; height: 100%; object-fit: cover; transform: scale(1.3); transform-origin: center top; }
-.device-home .device-card { display: flex; align-items: center; gap: 16px; padding: 16px; margin-top: 16px; background: #e8f3ff; }
+.device-home .device-card { position: relative; margin-top: 16px; background: #e8f3ff; }
+.device-home .device-card-open { display: flex; align-items: center; gap: 16px; width: 100%; padding: 16px; border: 0; border-radius: inherit; background: transparent; text-align: left; }
+.device-home .device-card.has-control .device-meta { padding-right: 44px; }
+.device-home .device-quick-control { position: absolute; right: 12px; top: 50%; translate: 0 -50%; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: #4080ff; color: #fff; }
+.device-home .device-quick-control:disabled { opacity: .5; cursor: default; }
+.device-home .device-control-feedback { position: absolute; z-index: 40; top: 84px; left: 20px; right: 20px; }
 .device-home .device-image { display: grid; place-items: center; flex-shrink: 0; width: 80px; height: 80px; border-radius: 16px; background: #fff; box-shadow: 0 1px 4px #0000000a; }
 .device-home .device-image img { width: 60px; height: 60px; object-fit: contain; }
 .device-home .device-meta { flex: 1; min-width: 0; }

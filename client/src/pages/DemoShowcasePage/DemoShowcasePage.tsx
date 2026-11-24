@@ -99,7 +99,7 @@ export default function DemoShowcasePage() {
   const hasManagedSafeArea = hasDeviceBackground || ['settings', 'consumables'].includes(activeScreen);
   const background = darkMode ? '#121212' : hasDeviceBackground ? 'linear-gradient(180deg,#cce2ff 0%,#edf3fa 25%,#f9f7f5 46%,#f9f7f5 100%)' : '#F5F5F5';
   return <IPhoneFrame statusBarColor={darkMode ? '#FFFFFF' : '#000000'} background={background}>
-    <div className="relative h-full flex flex-col">
+    <div className="relative h-full flex flex-col" data-mobile-safe-area={hasManagedSafeArea ? 'device' : undefined}>
       {['home', 'custom-mode', 'run-control', 'smart-mode'].includes(activeScreen) && <OperationState operation={['home', 'custom-mode'].includes(activeScreen) ? 'cleaning.start' : 'running.control'} />}
       <div className={`app-page-body flex-1 min-h-0 ${['run-control', 'smart-mode'].includes(activeScreen) ? 'bw-running-state' : ''}`} style={{ paddingBottom: hasManagedSafeArea ? 0 : 32 }}>{screen}</div>
     </div>

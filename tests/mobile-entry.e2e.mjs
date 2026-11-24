@@ -56,8 +56,8 @@ try {
       assert.ok(await page.locator('.device-content').evaluate(node => {
         const content = node.getBoundingClientRect();
         const screen = node.closest('[data-app-screen]').getBoundingClientRect();
-        const header = node.querySelector('.bw-header, .home-header').getBoundingClientRect();
-        return content.top === screen.top && content.bottom === screen.bottom && header.top >= 62;
+        const back = node.querySelector('.bw-header button, .home-header button').getBoundingClientRect();
+        return content.top === screen.top && content.bottom === screen.bottom && back.top >= 62;
       }), 'background covers both safe areas while header stays below status bar');
       const shot = await page.screenshot({ path: `tests/artifacts/mobile-entry/safe-${device.replaceAll(' ', '-')}-${route.split('/').at(-1) || 'devices'}.png` });
       const seam = await page.evaluate(async base64 => {
@@ -89,11 +89,15 @@ try {
     await page.locator('[data-mode=auto] .bw-mode-open').click();
     await page.getByRole('button', { name: '开始清洗', exact: true }).click();
     await page.locator('.bw-progress').waitFor();
+    await page.waitForTimeout(600);
     assert.ok(await page.locator('.app-page-body').evaluate(node => {
       const screen = node.closest('[data-app-screen]').getBoundingClientRect();
       const body = node.getBoundingClientRect();
-      return body.top >= screen.top + 62 && body.bottom <= screen.bottom - 34;
-    }), 'device control content stays inside the safe area');
+      const header = node.querySelector('.bw-header').getBoundingClientRect();
+      const back = node.querySelector('.bw-header button').getBoundingClientRect();
+      const action = node.querySelector('.bw-dock .bw-primary').getBoundingClientRect();
+      return body.top === screen.top && body.bottom === screen.bottom && header.top === screen.top && back.top >= screen.top + 62 && action.bottom <= screen.bottom - 34;
+    }), 'device controls protect foreground safe areas without shrinking the page background');
     assert.ok(await page.locator('[data-app-screen]').evaluate(node => {
       const screen = node.getBoundingClientRect();
       const color = getComputedStyle(node).backgroundImage;

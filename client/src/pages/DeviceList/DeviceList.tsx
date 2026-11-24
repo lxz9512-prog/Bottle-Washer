@@ -1,12 +1,13 @@
-import React, { useSyncExternalStore } from "react";
+import React, { useRef, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, LoaderCircle, Pause, Play, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import IPhoneFrame from "@client/src/components/IPhoneFrame";
 import { cleaningMachineStore } from "../DemoShowcasePage/cleaning-machine-store";
 import type { CleaningMachineState } from "../DemoShowcasePage/cleaning-machine-store";
 import { OperationState, useDemo, useDemoPage, useOperation } from '../../demo/react';
-import { cycleProgress, cycleSteps } from '../DemoShowcasePage/machine-cycle';
+import { cycleMinutes, cycleProgress, cycleSteps } from '../DemoShowcasePage/machine-cycle';
+import { useDeviceCopy } from '../DemoShowcasePage/DeviceUI';
 import monitorPreview from '../../assets/monitor-preview.jpg';
 import monitorCamera from '../../assets/mobile-home/monitor-camera.png';
 import tabHome from '../../assets/mobile-home/tab-home.png';
@@ -14,56 +15,77 @@ import tabDevice from '../../assets/mobile-home/tab-device.png';
 import tabCommunity from '../../assets/mobile-home/tab-community.png';
 import tabMe from '../../assets/mobile-home/tab-me.png';
 import './device-home.css';
-import { MACHINE_MODELS, getDeviceName, machinePath } from '../DemoShowcasePage/machine-models';
+import { MACHINE_MODELS, getDeviceName, machinePath, type MachineModelId } from '../DemoShowcasePage/machine-models';
+import { demoEngine } from '../../demo/engine';
 
-const MODE_LABELS: Record<string, string> = {
-  smart: 'Smart Mode',
-  auto: 'Standard',
-  rapid: 'Rapid',
-  'self-clean': 'Self Clean',
-  baby: 'Breast Pump',
-  bottles: 'Teethers',
-  'food-bowl': 'Baby Dish',
-  'delicate-wash': 'Adaptive Material Care',
-  'breast-pump': 'Breast Pump',
-  custom: 'Custom',
-};
+const hasRunningCycle = (state: CleaningMachineState) => state.cycleActive && !state.scheduleAt
+  && !cycleProgress(cycleSteps(state.selectedMode, state.customConfig), state.elapsedSeconds).complete;
+const controlUnavailable = (state: CleaningMachineState) => ['offline', 'error-df', 'error-af'].includes(state.presentation);
 
 const DeviceList: React.FC = () => {
   useDemoPage('devices');
   useOperation({ operation: 'devices.load', stage: 'devices', label: '查找设备', success: () => {} });
   const { active } = useDemo();
+  const { copy } = useDeviceCopy();
   const navigate = useNavigate();
   const machines = useSyncExternalStore(cleaningMachineStore.subscribe, cleaningMachineStore.getAllSnapshot);
+  const controlTarget = useRef<MachineModelId | null>(null);
+  const getControlTarget = () => controlTarget.current ?? MACHINE_MODELS.find(model => hasRunningCycle(cleaningMachineStore.get(model.id)))?.id;
+  const control = useOperation({
+    operation: 'running.control', stage: 'running', label: '设备列表运行控制',
+    ready: () => {
+      const id = getControlTarget();
+      return !!id && hasRunningCycle(cleaningMachineStore.get(id)) && !controlUnavailable(cleaningMachineStore.get(id));
+    },
+    success: () => {
+      const id = getControlTarget();
+      if (!id) return;
+      const state = cleaningMachineStore.get(id);
+      if (!hasRunningCycle(state) || controlUnavailable(state)) return;
+      cleaningMachineStore.set({ isRunning: !state.isRunning, runStartedAt: state.isRunning ? null : Date.now() }, id);
+    },
+  });
+  const toggleDevice = (id: MachineModelId) => {
+    const request = demoEngine.getSnapshot().active;
+    if (request?.status === 'loading') return;
+    if (request?.request.operation === 'running.control' && controlTarget.current !== id) demoEngine.normal();
+    controlTarget.current = id;
+    cleaningMachineStore.selectModel(id);
+    control();
+  };
   const deviceStatus = (machineState: CleaningMachineState) => {
-  const isDeviceActive = machineState.cycleActive || !!machineState.scheduleAt;
-  const progress = cycleProgress(cycleSteps(machineState.selectedMode, machineState.customConfig), machineState.elapsedSeconds);
-  const remainingLabel = progress.remaining > 0
-    ? `${Math.ceil(progress.remaining / 60)} min left`
-    : '';
-  const storing = progress.remaining <= 0 && !progress.complete && progress.totalRemaining > 0;
-  const storageMinutes = Math.ceil(progress.totalRemaining / 60);
-  const storageRemainingLabel = progress.totalRemaining < 3600
-    ? `${storageMinutes} min left`
-    : `${Math.ceil(progress.totalRemaining / 3600)} h left`;
-  const lastUsed = machineState.lastUsedAt ? new Date(machineState.lastUsedAt) : null;
-  const lastUsedLabel = lastUsed?.toLocaleString([], { ...(lastUsed.toDateString() === new Date().toDateString() ? {} : { month: 'short' as const, day: 'numeric' as const }), hour: '2-digit', minute: '2-digit', hour12: false });
-  const statusText = machineState.scheduleAt ? 'Scheduled' : isDeviceActive
-    ? (progress.complete ? 'Done' : storing && machineState.isRunning ? '保管中' : machineState.isRunning ? remainingLabel : 'Paused')
-    : lastUsed ? `Last used · ${lastUsedLabel}` : 'Not used yet';
-  const statusColor = isDeviceActive
-    ? (machineState.isRunning || machineState.scheduleAt ? '#287dcc' : '#b56c15')
-    : '#9E9E9E';
-  const modeLabel = machineState.selectedMode
-    ? (machineState.modeConfig?.modeLabel || MODE_LABELS[machineState.selectedMode] || '')
-    : '';
-  const statusDetail = storing && machineState.isRunning ? storageRemainingLabel : modeLabel;
+    const isDeviceActive = machineState.cycleActive || !!machineState.scheduleAt;
+    const steps = cycleSteps(machineState.selectedMode, machineState.customConfig);
+    const progress = cycleProgress(steps, machineState.elapsedSeconds);
+    const remainingLabel = progress.remaining > 0 ? `${Math.ceil(progress.remaining / 60)} min left` : '';
+    const storing = progress.remaining <= 0 && !progress.complete && progress.totalRemaining > 0;
+    const storageRemainingLabel = progress.totalRemaining < 3600
+      ? `${Math.ceil(progress.totalRemaining / 60)} min left`
+      : `${Math.ceil(progress.totalRemaining / 3600)} h left`;
+    const formatTime = (date: Date) => date.toLocaleString([], {
+      ...(date.toDateString() === new Date().toDateString() ? {} : { month: 'short' as const, day: 'numeric' as const }),
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    });
+    const lastUsed = machineState.lastUsedAt ? new Date(machineState.lastUsedAt) : null;
+    const scheduledCompletion = machineState.scheduleAt
+      ? formatTime(new Date(machineState.scheduleAt + cycleMinutes(steps) * 60000))
+      : '';
+    const statusText = machineState.scheduleAt
+      ? copy(`Finishes at ${scheduledCompletion}`, `预计完成 ${scheduledCompletion}`)
+      : isDeviceActive
+        ? (progress.complete ? 'Done' : storing && machineState.isRunning ? '保管中' : machineState.isRunning ? remainingLabel : 'Paused')
+        : lastUsed ? `Last used · ${formatTime(lastUsed)}` : 'Not used yet';
+    const statusColor = isDeviceActive
+      ? (machineState.isRunning || machineState.scheduleAt ? '#287dcc' : '#b56c15')
+      : '#9E9E9E';
+    const statusDetail = !machineState.scheduleAt && storing && machineState.isRunning ? storageRemainingLabel : '';
     return { isDeviceActive, statusText, statusColor, statusDetail };
   };
 
   return (
     <IPhoneFrame background="#fcf9f7">
       <div className="device-home">
+        {active?.request.operation === 'running.control' && <div className="device-control-feedback"><OperationState operation="running.control" /></div>}
         <header className="home-header">
           <h1>Clara's Family</h1>
           <motion.button type="button" aria-label="添加设备" whileTap={{ scale: 0.95 }} className="home-add">
@@ -97,14 +119,21 @@ const DeviceList: React.FC = () => {
           {MACHINE_MODELS.map(model => {
             const machineState = machines[model.id];
             const { isDeviceActive, statusText, statusColor, statusDetail } = deviceStatus(machineState);
-            return <motion.button
+            const showControl = hasRunningCycle(machineState);
+            const pending = active?.request.operation === 'running.control' && active.status === 'loading' && getControlTarget() === model.id;
+            const controlLabel = `${machineState.isRunning ? copy('Pause', '暂停') : copy('Resume', '启动')} ${getDeviceName(model.id)}`;
+            return <div
             key={model.id}
-            type="button"
             data-model={model.id}
             data-connector="device"
+            className={`home-card device-card ${showControl ? 'has-control' : ''}`}
+          >
+            <motion.button
+            type="button"
+            className="device-card-open"
+            aria-label={copy(`Open ${getDeviceName(model.id)}`, `打开 ${getDeviceName(model.id)}`)}
             whileTap={{ scale: 0.98 }}
             onClick={() => { const screen = isDeviceActive ? machineState.selectedMode === 'smart' ? 'smart-mode' : 'run-control' : 'home'; cleaningMachineStore.set({ activeScreen: screen }, model.id); navigate(machinePath(screen, model.id)); }}
-            className="home-card device-card"
           >
             <span className="device-image">
               <img src={model.image} alt={model.name} />
@@ -112,7 +141,7 @@ const DeviceList: React.FC = () => {
             <span className="device-meta">
               <span className="device-heading">
                 <span className="device-title">{getDeviceName(model.id)}</span>
-                <ChevronRight size={20} aria-hidden="true" />
+                {!showControl && <ChevronRight size={20} aria-hidden="true" />}
               </span>
               <span className="device-status">
                 <span className="device-status-dot" style={{ backgroundColor: statusColor }} />
@@ -120,7 +149,14 @@ const DeviceList: React.FC = () => {
                 {isDeviceActive && statusDetail && <span className="device-mode">· {statusDetail}</span>}
               </span>
             </span>
-          </motion.button>;
+            </motion.button>
+            {showControl && <motion.button type="button" className="device-quick-control" data-device-control={model.id}
+              aria-label={controlLabel} title={controlLabel} aria-busy={pending}
+              disabled={active?.status === 'loading' || controlUnavailable(machineState)}
+              whileTap={{ scale: 0.92 }} onClick={() => toggleDevice(model.id)}>
+              {pending ? <LoaderCircle size={20} className="animate-spin" aria-hidden="true" /> : machineState.isRunning ? <Pause size={18} fill="currentColor" aria-hidden="true" /> : <Play size={18} fill="currentColor" aria-hidden="true" />}
+            </motion.button>}
+          </div>;
           })}
           </>}
         </section>

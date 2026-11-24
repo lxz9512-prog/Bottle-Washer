@@ -24,9 +24,10 @@ export interface DemoPage {
 }
 const note = (title: string, body: string, target: string) => ({ title, body, target });
 export const pages: Record<string, DemoPage> = {
-  devices: { id: 'devices', title: '设备列表', stage: 'devices', operations: ['devices.load'], notes: [
+  devices: { id: 'devices', title: '设备列表', stage: 'devices', operations: ['devices.load', 'running.control'], notes: [
     note('清洗机入口', 'BW05S、BW05P、BW05A 各有独立设备入口。运行、预约与自定义模式按型号保存，返回设备列表后继续计时。', 'device'),
-    note('列表状态', '加载、空态和失败场景替换列表内容；清洗中显示剩余分钟；进入保管后显示“保管中”和剩余时间，剩余时间达到 1 小时显示小时，不足 1 小时显示分钟，保管状态不显示模式名称；恢复正常不重放启动操作。', 'content'),
+    note('列表状态', '加载、空态和失败场景替换列表内容；运行中仅显示工作周期剩余时间，不显示模式名称；预约中仅显示预计完成时间，按预约启动时间加工作周期时长计算，不包含保管时长，跨天同时显示日期。进入保管后显示“保管中”和剩余时间，剩余时间达到 1 小时显示小时，不足 1 小时显示分钟，不显示模式名称；恢复正常不重放启动操作。', 'content'),
+    note('快捷暂停与启动', '设备工作中（含保管）时，卡片右侧箭头替换为暂停按钮，暂停后替换为启动按钮，启动继续原周期与剩余时间。按钮只控制对应设备，不进入详情；点击卡片其他区域进入控制页。指令处理中显示加载并禁止重复操作，成功后才改变运行状态；失败保留原状态，可重试或取消。预约、空闲和已完成设备保留箭头。', 'device'),
   ] },
   home: { id: 'home', title: '模式选择', stage: 'cleaning', operations: ['cleaning.start'], notes: [
     note('模式选择', '点击任意模式打开底部浮窗；预设模式名称固定，自定义模式仅可在浮窗内改名并本地保存，最多保存三个自定义模式。', 'content'),

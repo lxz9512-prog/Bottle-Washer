@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, type ReactNode } from "react";
 import { isApp } from '../runtime';
 import './device.css';
 
@@ -9,6 +9,20 @@ interface IPhoneFrameProps {
 }
 
 const IPhoneFrame = ({ children, background = "transparent", statusBarColor = "#000000" }: IPhoneFrameProps) => {
+  useLayoutEffect(() => {
+    if (!isApp) return;
+    const root = document.documentElement;
+    const screenBackground = background === 'transparent' ? '#edf3fa' : background;
+    const colors = screenBackground.match(/#[\da-f]{3,8}/ig) ?? ['#edf3fa'];
+    root.style.setProperty('--app-screen-background', screenBackground);
+    root.style.setProperty('--app-screen-edge-color', colors.at(-1)!);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', colors[0]);
+    return () => {
+      root.style.removeProperty('--app-screen-background');
+      root.style.removeProperty('--app-screen-edge-color');
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#edf3fa');
+    };
+  }, [background]);
   if (isApp) return <div data-app-screen data-device-screen className="app-screen" style={{ background }}>
     <div data-connector="content" className="device-content">{children}</div>
   </div>;
