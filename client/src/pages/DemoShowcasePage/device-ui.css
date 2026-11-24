@@ -22,6 +22,8 @@
 .bw-device.bw-dark .bw-options button.selected{background:#163e5c;color:#a8dcff}
 .bw-feedback-banner{position:absolute;z-index:30;top:60px;left:18px;right:18px;display:flex;gap:8px;align-items:flex-start;padding:12px;border-radius:15px;background:var(--bw-card);box-shadow:0 4px 18px #0000000a;font-size:11px;line-height:16px;color:var(--bw-ink)}
 .bw-feedback-banner>svg{flex-shrink:0;color:#e77e81}.bw-feedback-banner p{margin:0}.bw-feedback-banner button{border:0;background:transparent;padding:0;color:#bb625e;font-size:11px;text-align:left}.bw-feedback-banner .bw-dismiss{margin-left:auto;color:var(--bw-muted)}
+.bw-feedback-banner.bw-cleaning-reminder{position:relative;top:auto;left:auto;right:auto;z-index:auto;flex-shrink:0;align-items:center;gap:10px;margin:10px 18px 8px;padding:14px 12px 14px 14px;border-radius:24px;font-size:13px;line-height:20px}
+.bw-cleaning-reminder>p{flex:1;min-width:0;overflow-wrap:anywhere}.bw-cleaning-reminder .bw-dismiss{align-self:flex-start;display:flex;align-items:center;justify-content:center;flex-shrink:0;width:24px;height:24px}
 .bw-disabled .bw-mode-card,.bw-disabled .bw-dock{opacity:.4;pointer-events:none}.bw-connection-product{height:100px;object-fit:contain;display:block;margin:20px auto}.bw-support-details{font-size:12px;line-height:20px;color:var(--bw-muted);margin-bottom:22px}
 
 .bw-product-with-supplies { height: 190px; position: relative; gap: 0; }

@@ -8,6 +8,7 @@ import { normalizeDuration } from './machine-cycle';
 import type { SubModeConfig } from './demo-constants';
 import './device-ui.css';
 import { getDeviceName, getMachineModel } from './machine-models';
+import { needsCleaningReminder } from './machine-maintenance';
 
 export function useDeviceCopy() {
   const { locale, t } = useLocale();
@@ -55,6 +56,17 @@ export function DeviceHeader({ onBack, onSettings, title }: { onBack: () => void
     <h1>{title ?? getDeviceName()}</h1>
     {onSettings ? <button className="bw-icon" title={copy('Settings', '设备设置')} aria-label={copy('Settings', '设备设置')} onClick={onSettings}><Settings size={24} /></button> : <span />}
   </header>;
+}
+
+export function MachineCleaningReminder() {
+  const machine = useSyncExternalStore(cleaningMachineStore.subscribe, cleaningMachineStore.getSnapshot);
+  const { copy } = useDeviceCopy();
+  if (!needsCleaningReminder(machine) || machine.presentation !== 'normal') return null;
+  return <div className="bw-feedback-banner bw-cleaning-reminder" role="status" data-cleaning-reminder data-connector="reminder">
+    <CircleAlert size={20} aria-hidden="true" />
+    <p>{copy(`Used ${machine.completedWorkCount} times. Run Machine Clean to clean your device.`, `已使用${machine.completedWorkCount}次，建议使用机器清洁模式对设备进行一次清洁`)}</p>
+    <button className="bw-dismiss" aria-label={copy('Dismiss cleaning reminder', '关闭机器清洁提醒')} onClick={() => cleaningMachineStore.dismissCleaningReminder()}><X size={16} /></button>
+  </div>;
 }
 
 export function DeviceProduct({ onConsumables }: { onConsumables?: () => void }) {

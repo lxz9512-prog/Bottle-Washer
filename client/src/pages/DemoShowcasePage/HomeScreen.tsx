@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Play, Clock3, Plus, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ModeIcon } from './ModeIcon';
 import { type ModeConfig, type SubModeConfig } from './demo-constants';
-import { DeviceSurface, DeviceHeader, DeviceProduct, DeviceSheet, CustomEditor, ScheduleSheet, StepIcon, useDeviceCopy, useDeviceUnavailable } from './DeviceUI';
+import { DeviceSurface, DeviceHeader, DeviceProduct, DeviceSheet, MachineCleaningReminder, CustomEditor, ScheduleSheet, StepIcon, useDeviceCopy, useDeviceUnavailable } from './DeviceUI';
 import { usePhoneToast } from './usePhoneToast';
 import { useOperation } from '../../demo/react';
 import { entryPath } from '../../runtime';
@@ -81,6 +81,7 @@ export default function HomeScreen({ onNavigate, selectedMode, onSelectMode, las
   return <DeviceSurface>
     {ToastElement}
     <DeviceHeader onBack={() => navigate(entryPath())} onSettings={onSettings} />
+    <MachineCleaningReminder />
     <div className="bw-scroll" data-connector="content">
       <DeviceProduct onConsumables={onConsumables} />
       {groups.map(group => <section className="bw-mode-group" key={group.title}><h2>{group.title}</h2><div className="bw-mode-grid">

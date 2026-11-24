@@ -1,8 +1,9 @@
 import type { SubModeConfig, ModeConfig } from './demo-constants';
 import { activateMachineModel, getMachineModel, MACHINE_MODELS, machineLocal, supportsMode, type MachineModelId } from './machine-models';
 import { isApp } from '../../runtime';
+import { cleaningReminderMilestone, DEFAULT_MAINTENANCE, normalizeMaintenance, updateMaintenance, type MachineMaintenance } from './machine-maintenance';
 
-export interface CleaningMachineState {
+export interface CleaningMachineState extends MachineMaintenance {
   activeScreen: string;
   selectedMode: string | null;
   isRunning: boolean;
@@ -19,6 +20,7 @@ export interface CleaningMachineState {
 }
 
 const DEFAULT_STATE: CleaningMachineState = {
+  ...DEFAULT_MAINTENANCE,
   activeScreen: 'home',
   selectedMode: null,
   isRunning: true,
@@ -36,7 +38,7 @@ const DEFAULT_STATE: CleaningMachineState = {
 
 function sanitize(state: CleaningMachineState, id: MachineModelId): CleaningMachineState {
   if ((state.selectedMode && !supportsMode(state.selectedMode, id)) || (state.modeConfig && !supportsMode(state.modeConfig.modeId, id))) {
-    state = { ...DEFAULT_STATE, lastUsedAt: state.lastUsedAt };
+    state = { ...DEFAULT_STATE, ...normalizeMaintenance(state), lastUsedAt: state.lastUsedAt, cycleUsageRecorded: false };
   }
   if (state.lastUsedMode && !supportsMode(state.lastUsedMode, id)) state = { ...state, lastUsedMode: null };
   if (state.activeScreen === 'smart-mode' && !supportsMode('smart', id)) state = { ...state, activeScreen: 'home' };
@@ -45,11 +47,21 @@ function sanitize(state: CleaningMachineState, id: MachineModelId): CleaningMach
 }
 let states = Object.fromEntries(MACHINE_MODELS.map(({ id }) => {
   const saved = isApp ? machineLocal.get<Partial<CleaningMachineState>>('machine', {}, id) : {};
-  const state = sanitize({ ...DEFAULT_STATE, ...saved, presentation: 'normal' }, id);
+  const maintenance = machineLocal.get<Partial<MachineMaintenance>>('machine-maintenance', saved, id);
+  const initial = sanitize({ ...DEFAULT_STATE, ...saved, ...normalizeMaintenance({ ...saved, ...maintenance }), presentation: 'normal' }, id);
+  const state = { ...initial, ...updateMaintenance(initial, initial) };
   if (isApp) machineLocal.set('machine', state, id);
+  saveMaintenance(state, id);
   return [id, state];
 })) as Record<MachineModelId, CleaningMachineState>;
 let listeners: Array<() => void> = [];
+
+function saveMaintenance(state: MachineMaintenance, id: MachineModelId) {
+  machineLocal.set('machine-maintenance', {
+    completedWorkCount: state.completedWorkCount,
+    dismissedCleaningReminderAt: state.dismissedCleaningReminderAt,
+  }, id);
+}
 
 export const cleaningMachineStore = {
   getSnapshot: () => states[getMachineModel().id],
@@ -64,10 +76,17 @@ export const cleaningMachineStore = {
   },
 
   set(partial: Partial<CleaningMachineState>, id: MachineModelId = getMachineModel().id) {
-    const state = sanitize({ ...states[id], ...partial }, id);
+    const previous = states[id];
+    const next = sanitize({ ...previous, ...partial }, id);
+    const state = { ...next, ...updateMaintenance(previous, next) };
     states = { ...states, [id]: state };
     if (isApp) machineLocal.set('machine', state, id);
+    if (state.completedWorkCount !== previous.completedWorkCount || state.dismissedCleaningReminderAt !== previous.dismissedCleaningReminderAt) saveMaintenance(state, id);
     listeners.forEach(fn => fn());
+  },
+
+  dismissCleaningReminder() {
+    this.set({ dismissedCleaningReminderAt: cleaningReminderMilestone(this.get().completedWorkCount) });
   },
 
   isDeviceActive(): boolean {
@@ -78,8 +97,10 @@ export const cleaningMachineStore = {
   reset(all = false) {
     const ids = all ? MACHINE_MODELS.map(model => model.id) : [getMachineModel().id];
     for (const id of ids) {
-      states = { ...states, [id]: { ...DEFAULT_STATE } };
-      if (isApp) machineLocal.remove('machine', id);
+      const maintenance = all ? DEFAULT_MAINTENANCE : normalizeMaintenance(states[id]);
+      states = { ...states, [id]: { ...DEFAULT_STATE, ...maintenance, cycleUsageRecorded: false } };
+      if (isApp) machineLocal.set('machine', states[id], id);
+      if (all) machineLocal.remove('machine-maintenance', id);
     }
     listeners.forEach(fn => fn());
   },
