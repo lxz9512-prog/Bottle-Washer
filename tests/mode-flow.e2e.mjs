@@ -122,8 +122,10 @@ try {
   await page.getByRole('button', { name: '收起面板', exact: true }).click({ position: { x: 10, y: 60 } });
   await dialog.waitFor({ state: 'hidden' });
   await open('self-clean');
-  assert.equal(await dialog.locator('.bw-preset-step').count(), 1);
-  assert.equal(await dialog.locator('.bw-preset-step').first().isDisabled(), true);
+  assert.equal(await dialog.locator('.bw-preset-step').count(), 2);
+  assert.equal(await dialog.locator('.bw-preset-step:disabled').count(), 2);
+  assert.deepEqual(await dialog.locator('.bw-preset-step strong').allTextContents(), ['20 分钟', '10 分钟']);
+  assert.equal(await dialog.locator('.bw-cycle-duration').innerText(), '清洗周期时长 · 30 分钟');
   assert.equal(await dialog.locator('.bw-storage-section').count(), 0);
   await collapse();
   await open('sterilize-dry');

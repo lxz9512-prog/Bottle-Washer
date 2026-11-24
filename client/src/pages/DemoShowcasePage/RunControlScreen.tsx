@@ -4,7 +4,7 @@ import type { SubModeConfig, ModeConfig } from './demo-constants';
 import { DeviceSurface, DeviceHeader, DeviceProduct, DeviceSheet, CustomEditor, ScheduleSheet, useDeviceCopy, useDeviceUnavailable } from './DeviceUI';
 import { usePhoneToast } from './usePhoneToast';
 import { cleaningMachineStore } from './cleaning-machine-store';
-import { cycleSteps, cycleProgress, lockedCycleSteps, isCustomMode, pausedCycleEdits } from './machine-cycle';
+import { cycleSteps, cycleProgress, lockedCycleSteps, isCustomMode, pausedCycleEdits, isRequiredCycleStep } from './machine-cycle';
 
 interface RunControlScreenProps {
   suspended?: boolean;
@@ -71,7 +71,7 @@ export default function RunControlScreen({ suspended = false, isRunning, selecte
       </button>
     </div>
     {showStop && <div data-screen-overlay className="bw-overlay bw-confirm-overlay"><button className="bw-backdrop" aria-label={t('cancel')} onClick={() => setShowStop(false)} /><section className="bw-confirm" role="dialog" aria-modal="true" aria-label={t('stop')}><h2>{copy('Washing unfinished. Confirm stop?', '清洗尚未完成，确认停止？')}</h2><button className="bw-stop" onClick={onStop}>{t('stop')}</button><button onClick={() => setShowStop(false)}>{t('cancel')}</button></section></div>}
-    {draft && <DeviceSheet title={modeLabel} onClose={() => setDraft(null)}><CustomEditor steps={editableSteps!} onChange={next => setDraft(draft.map(step => next.find(item => item.id === step.id) ?? step))} locked={locked} required={custom ? [] : ['wash']} durationEditable={step => custom || step.id === 'keep-warm'} onInvalid={() => showToast(copy('Value out of range. Retry.', '数值超出范围，请重试。'))} /><button className="bw-primary" onClick={() => { onUpdateCustomConfig?.(pausedCycleEdits(selectedMode, steps, draft, machine.elapsedSeconds)); setDraft(null); }}>{copy('Done', '完成')}</button></DeviceSheet>}
+    {draft && <DeviceSheet title={modeLabel} onClose={() => setDraft(null)}><CustomEditor steps={editableSteps!} onChange={next => setDraft(draft.map(step => next.find(item => item.id === step.id) ?? step))} locked={locked} required={steps.filter(step => isRequiredCycleStep(selectedMode, step.id)).map(step => step.id)} durationEditable={step => custom || step.id === 'keep-warm'} onInvalid={() => showToast(copy('Value out of range. Retry.', '数值超出范围，请重试。'))} /><button className="bw-primary" onClick={() => { onUpdateCustomConfig?.(pausedCycleEdits(selectedMode, steps, draft, machine.elapsedSeconds)); setDraft(null); }}>{copy('Done', '完成')}</button></DeviceSheet>}
     {showSchedule && <ScheduleSheet modeLabel={modeLabel} scheduledAt={machine.scheduleAt} onClose={() => setShowSchedule(false)} onDelete={removeSchedule} onSave={minutes => { cleaningMachineStore.set({ scheduleAt: Date.now() + minutes * 60000 }); setShowSchedule(false); showToast(copy('Schedule updated', '预约已更新')); }} />}
   </DeviceSurface>;
 }

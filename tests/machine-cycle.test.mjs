@@ -7,7 +7,7 @@ const load = path => ts.transpile(readFileSync(new URL(path, import.meta.url), '
 const asUrl = source => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
 const constantsUrl = asUrl(load('../client/src/pages/DemoShowcasePage/demo-constants.ts'));
 const { DEFAULT_CUSTOM_MODES } = await import(constantsUrl);
-const { cycleSteps, cycleMinutes, isCustomMode, cycleProgress, normalizeDuration, lockedCycleSteps, pausedCycleEdits } = await import(asUrl(load('../client/src/pages/DemoShowcasePage/machine-cycle.ts').replace('./demo-constants', constantsUrl)));
+const { cycleSteps, cycleMinutes, isCustomMode, cycleProgress, normalizeDuration, lockedCycleSteps, pausedCycleEdits, isRequiredCycleStep } = await import(asUrl(load('../client/src/pages/DemoShowcasePage/machine-cycle.ts').replace('./demo-constants', constantsUrl)));
 
 test('custom starts unchecked and duration ranges match the design', () => {
   assert.ok(DEFAULT_CUSTOM_MODES.every(step => !step.enabled));
@@ -27,7 +27,7 @@ test('progress advances in order, excludes disabled stages and counts keep warm 
   assert.equal(cycleProgress(steps, 93 * 60).complete, false);
   assert.equal(cycleProgress(steps, 93 * 60).totalRemaining, 72 * 3600);
   assert.equal(cycleProgress(steps, 93 * 60 + 72 * 3600).complete, true);
-  assert.deepEqual(cycleProgress(cycleSteps('self-clean', null), 0).statuses.map(s => s.status), ['active', 'off', 'off', 'off']);
+  assert.deepEqual(cycleProgress(cycleSteps('self-clean', null), 0).statuses.map(s => s.status), ['active', 'off', 'pending', 'off']);
 });
 test('paused edits lock earlier skipped stages as well as current and completed stages', () => {
   const steps = DEFAULT_CUSTOM_MODES.map((step, index) => ({ ...step, enabled: index > 0 }));
@@ -38,7 +38,7 @@ test('paused edits lock earlier skipped stages as well as current and completed 
 test('preset durations exclude storage and sterilize-dry excludes washing', () => {
   assert.equal(cycleMinutes(cycleSteps('auto', null)), 93);
   assert.equal(cycleMinutes(cycleSteps('rapid', null)), 83);
-  assert.equal(cycleMinutes(cycleSteps('self-clean', null)), 29);
+  assert.equal(cycleMinutes(cycleSteps('self-clean', null)), 30);
   assert.equal(cycleMinutes(cycleSteps('sterilize-dry', null)), 64);
   assert.equal(cycleSteps('sterilize-dry', null)[0].enabled, false);
   const changed = cycleSteps('auto', null).map(step => ({ ...step, enabled: step.id !== 'wash', duration: step.id === 'keep-warm' ? 12 : step.duration }));
@@ -76,8 +76,27 @@ test('paused edits preserve unavailable preset steps and allow custom future dur
   const steps = cycleSteps('self-clean', null);
   const draft = steps.map(step => ({ ...step, enabled: true, duration: step.max }));
   assert.deepEqual(pausedCycleEdits('self-clean', steps, draft, 1), steps);
-  const custom = cycleSteps('custom-2', draft);
+  const custom = cycleSteps('custom-2', DEFAULT_CUSTOM_MODES.map(step => ({ ...step, enabled: true, duration: step.max })));
   const edited = pausedCycleEdits('custom-2', custom, custom.map(step => ({ ...step, duration: step.min })), 1);
   assert.deepEqual(edited[0], custom[0]);
   assert.equal(edited[2].duration, 40);
+});
+
+
+test('machine clean fixes wash at 20 min and dry at 10 min, overriding old preferences', () => {
+  const legacy = DEFAULT_CUSTOM_MODES.map(step => ({...step, enabled:step.id==='wash'}));
+  const steps = cycleSteps('self-clean', legacy);
+  assert.deepEqual(steps.filter(step=>step.enabled).map(step=>[step.id,step.duration,step.min,step.max]),[['wash',20,20,20],['dry',10,10,10]]);
+  assert.equal(cycleMinutes(steps),30);
+  assert.equal(isRequiredCycleStep('self-clean','wash'),true);
+  assert.equal(isRequiredCycleStep('self-clean','dry'),true);
+  assert.deepEqual(cycleProgress(steps,20*60).statuses.map(step=>step.status),['completed','off','active','off']);
+  assert.equal(cycleProgress(steps,20*60).remaining,10*60);
+  assert.equal(cycleProgress(steps,30*60).complete,true);
+  const edited=steps.map(step=>({...step,enabled:false,duration:999}));
+  assert.deepEqual(pausedCycleEdits('self-clean',steps,edited,1),steps);
+  assert.deepEqual(pausedCycleEdits('self-clean',legacy,edited,1),steps);
+  assert.equal(isRequiredCycleStep('auto','dry'),false);
+  assert.equal(isRequiredCycleStep('custom','wash'),false);
+  assert.equal(isRequiredCycleStep('sterilize-dry','wash'),false);
 });

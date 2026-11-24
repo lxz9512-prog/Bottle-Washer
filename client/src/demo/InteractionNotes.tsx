@@ -48,7 +48,10 @@ export default function InteractionNotes({
   const requestId = useRef(0);
   const sessionRequestId = useRef(0);
   const editor = editors[page.id];
-  const snapshot = editor?.snapshot ?? { notes: page.notes, revision: null };
+  const snapshot: NotesSnapshot = editor?.snapshot ?? {
+    notes: page.notes,
+    revision: null,
+  };
   const draft = editor?.draft;
   const notes = draft ?? snapshot.notes;
   const saving = savingPages.has(page.id);
@@ -170,7 +173,12 @@ export default function InteractionNotes({
         ...current[page.id],
         draft: [
           ...current[page.id].draft!,
-          { title: '', body: '', target: '' },
+          {
+            id: `custom-${crypto.randomUUID()}`,
+            title: '',
+            body: '',
+            target: '',
+          },
         ],
       },
     }));
@@ -178,7 +186,7 @@ export default function InteractionNotes({
     setFailed(false);
   };
   const removeNote = (index: number) => {
-    if (index < page.notes.length || busy || saving) return;
+    if (!draft || busy || saving) return;
     setEditors((current) => ({
       ...current,
       [page.id]: {
@@ -186,6 +194,8 @@ export default function InteractionNotes({
         draft: current[page.id].draft!.filter((_, i) => i !== index),
       },
     }));
+    setMessage('');
+    setFailed(false);
   };
   const save = async () => {
     if (!draft || busy || saving) return;
@@ -368,31 +378,37 @@ export default function InteractionNotes({
             </div>
           </form>
         )}
-        {notes.map((note, index) =>
-          draft ? (
+        {notes.length === 0 && (
+          <p className="tool-muted">
+            {draft ? '暂无说明，点击下方“新增说明”添加。' : '暂无交互说明。'}
+          </p>
+        )}
+        {notes.map((note, index) => {
+          const previous = note.id
+            ? snapshot.notes.find((saved) => saved.id === note.id)
+            : snapshot.notes[index];
+          return draft ? (
             <section
               className="note-editor"
-              key={`${page.id}:${index}`}
+              key={`${page.id}:${note.id ?? index}`}
               data-note-target={note.target}
             >
-              {index >= page.notes.length && (
-                <button
-                  className="note-remove"
-                  aria-label={`删除说明 ${index + 1}`}
-                  disabled={busy || saving}
-                  onClick={() => removeNote(index)}
-                >
-                  <Trash2 size={14} />
-                  删除说明
-                </button>
-              )}
+              <button
+                className="note-remove"
+                aria-label={`删除说明 ${index + 1}`}
+                disabled={busy || saving}
+                onClick={() => removeNote(index)}
+              >
+                <Trash2 size={14} />
+                删除说明
+              </button>
               <label>
                 标题
                 <input
                   aria-label={`说明 ${index + 1} 标题`}
                   value={note.title}
                   maxLength={120}
-                  autoFocus={index >= snapshot.notes.length}
+                  autoFocus={!previous}
                   disabled={busy || saving}
                   onChange={(event) =>
                     update(index, 'title', event.target.value)
@@ -411,25 +427,25 @@ export default function InteractionNotes({
                   }
                 />
               </label>
-              {snapshot.notes[index] &&
-                (snapshot.notes[index].body !== note.body ||
-                  snapshot.notes[index].title !== note.title) && (
+              {previous &&
+                (previous.body !== note.body ||
+                  previous.title !== note.title) && (
                   <details className="notes-comparison">
                     <summary>
                       查看线上版本
                       <ChevronDown size={14} />
                     </summary>
                     <p>
-                      {snapshot.notes[index].title}
+                      {previous.title}
                       {'\n'}
-                      {snapshot.notes[index].body}
+                      {previous.body}
                     </p>
                   </details>
                 )}
             </section>
           ) : (
             <details
-              key={`${page.id}:${index}`}
+              key={`${page.id}:${note.id ?? index}`}
               open
               data-note-target={note.target}
             >
@@ -439,8 +455,8 @@ export default function InteractionNotes({
               </summary>
               <p>{note.body}</p>
             </details>
-          ),
-        )}
+          );
+        })}
         {draft && (
           <button
             className="notes-add"

@@ -99,13 +99,9 @@ async function readBody(request) {
 }
 
 function validNotes(value, page) {
-  if (
-    !Array.isArray(value) ||
-    value.length < page.notes.length ||
-    value.length > 40
-  )
-    return null;
+  if (!Array.isArray(value) || value.length > 40) return null;
   const notes = [];
+  const identifiers = new Set();
   for (const [index, note] of value.entries()) {
     if (
       !note ||
@@ -117,10 +113,20 @@ function validNotes(value, page) {
       note.body.length > 10000
     )
       return null;
+    const id = note.id ?? `legacy-${index}`;
+    if (
+      typeof id !== 'string' ||
+      !/^(legacy-\d{1,3}|custom-[\da-f-]{36})$/.test(id) ||
+      identifiers.has(id)
+    )
+      return null;
+    identifiers.add(id);
+    const source = /^legacy-(\d+)$/.exec(id);
     notes.push({
+      id,
       title: note.title.trim(),
       body: note.body.trim(),
-      target: page.notes[index]?.target ?? '',
+      target: source ? (page.notes[Number(source[1])]?.target ?? '') : '',
     });
   }
   return notes;
@@ -183,8 +189,11 @@ async function notes(request, env, page) {
       .first();
     return json(
       row
-        ? { notes: JSON.parse(row.notes_json), revision: row.revision }
-        : { notes: page.notes, revision: null },
+        ? {
+            notes: validNotes(JSON.parse(row.notes_json), page),
+            revision: row.revision,
+          }
+        : { notes: validNotes(page.notes, page), revision: null },
     );
   }
   if (request.method !== 'PUT') return json({ message: '不支持此操作。' }, 405);

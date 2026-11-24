@@ -1,6 +1,6 @@
 import type { DemoPage } from './catalog';
 
-export type InteractionNote = DemoPage['notes'][number];
+export type InteractionNote = DemoPage['notes'][number] & { id?: string };
 export interface NotesSnapshot {
   notes: InteractionNote[];
   revision: string | null;
@@ -34,12 +34,9 @@ async function request(path: string, init: RequestInit = {}) {
 }
 
 function validateNotes(value: unknown, page: DemoPage): InteractionNote[] {
-  if (
-    !Array.isArray(value) ||
-    value.length < page.notes.length ||
-    value.length > 40
-  )
+  if (!Array.isArray(value) || value.length > 40)
     throw new NotesError('线上说明格式不兼容，原有内容已保留。');
+  const identifiers = new Set<string>();
   return value.map((note, index) => {
     if (
       !note ||
@@ -54,10 +51,21 @@ function validateNotes(value: unknown, page: DemoPage): InteractionNote[] {
         '每项说明需要标题和正文，标题最多 120 字，正文最多 10000 字。',
       );
     }
+    const id = note.id ?? `legacy-${index}`;
+    if (
+      typeof id !== 'string' ||
+      !/^(legacy-\d{1,3}|custom-[\da-f-]{36})$/.test(id) ||
+      identifiers.has(id)
+    ) {
+      throw new NotesError('线上说明格式不兼容，请读取最新说明后重试。');
+    }
+    identifiers.add(id);
+    const source = /^legacy-(\d+)$/.exec(id);
     return {
+      id,
       title: note.title.trim(),
       body: note.body.trim(),
-      target: page.notes[index]?.target ?? '',
+      target: source ? (page.notes[Number(source[1])]?.target ?? '') : '',
     };
   });
 }

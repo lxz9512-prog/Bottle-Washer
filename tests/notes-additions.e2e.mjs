@@ -72,7 +72,8 @@ try{
   const reader=await browser.newContext();
   const saved=await (await reader.request.get(`${base}api/notes/pages/devices`)).json();
   assert.deepEqual(saved.notes.slice(0,-1),original.notes);
-  assert.deepEqual(saved.notes.at(-1),{title:'新增交互说明回归',body:'新增正文第一行\n新增正文第二行',target:''});
+  assert.deepEqual({...saved.notes.at(-1),id:undefined},{id:undefined,title:'新增交互说明回归',body:'新增正文第一行\n新增正文第二行',target:''});
+  assert.ok(saved.notes.at(-1).id.startsWith('custom-'));
   await page.reload();
   await page.locator('.console-panel').waitFor();
   assert.equal(await page.locator('.global-panel,.console-panel').count(),2,'reload keeps both consoles visible');

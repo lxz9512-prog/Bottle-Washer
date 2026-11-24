@@ -1,19 +1,30 @@
 import { DEFAULT_CUSTOM_MODES, type SubModeConfig } from './demo-constants';
 
 export function cycleSteps(mode: string | null, custom: SubModeConfig[] | null): SubModeConfig[] {
+  if (mode === 'self-clean') return DEFAULT_CUSTOM_MODES.map(step => {
+    const duration = step.id === 'wash' ? 20 : step.id === 'dry' ? 10 : step.duration;
+    const enabled = step.id === 'wash' || step.id === 'dry';
+    return { ...step, enabled, duration, ...(enabled ? { min: duration, max: duration, step: 1 } : {}) };
+  });
   if (custom || isCustomMode(mode)) return (custom ?? DEFAULT_CUSTOM_MODES).map(step => ({
     ...step,
     enabled: step.id === 'wash' && !!mode && !isCustomMode(mode) && mode !== 'sterilize-dry' ? true : step.enabled,
   }));
   return DEFAULT_CUSTOM_MODES.map(step => ({
     ...step,
-    enabled: mode === 'self-clean' ? step.id === 'wash' : mode === 'sterilize-dry' ? step.id !== 'wash' : true,
+    enabled: mode === 'sterilize-dry' ? step.id !== 'wash' : true,
     duration: step.id === 'wash' && mode === 'rapid' ? 19 : step.duration,
   }));
 }
 
 export function isCustomMode(mode: string | null) {
   return ['custom', 'custom-2', 'custom-3'].includes(mode ?? '');
+}
+
+export function isRequiredCycleStep(mode: string | null, stepId: string) {
+  return mode === 'self-clean'
+    ? stepId === 'wash' || stepId === 'dry'
+    : stepId === 'wash' && !isCustomMode(mode) && mode !== 'sterilize-dry';
 }
 
 export function cycleMinutes(steps: SubModeConfig[]) {
@@ -54,6 +65,7 @@ export function lockedCycleSteps(steps: SubModeConfig[], elapsed: number) {
 }
 
 export function pausedCycleEdits(mode: string | null, steps: SubModeConfig[], draft: SubModeConfig[], elapsed: number) {
+  if (mode === 'self-clean') return cycleSteps(mode, null);
   const locked = lockedCycleSteps(steps, elapsed);
   const custom = isCustomMode(mode);
   const available = cycleSteps(mode, null);

@@ -30,7 +30,7 @@ export const pages: Record<string, DemoPage> = {
   ] },
   home: { id: 'home', title: '模式选择', stage: 'cleaning', operations: ['cleaning.start'], notes: [
     note('模式选择', '点击任意模式打开底部浮窗；预设模式名称固定，自定义模式仅可在浮窗内改名并本地保存，最多保存三个自定义模式。', 'content'),
-    note('启动与预约', '浮窗统一提供定时启动与启动。预设清洗步骤不可取消，其余步骤可选，固定时长不可修改；保管单独设置且不计入清洗周期。启动失败保留配置。', 'action'),
+    note('启动与预约', '浮窗统一提供定时启动与启动。预设清洗步骤不可取消，其余步骤可选；机器清洁固定清洗 20 分钟、烘干 10 分钟，两步均不可取消。固定时长不可修改；保管单独设置且不计入清洗周期。启动失败保留配置。', 'action'),
   ] },
   'custom-mode': { id: 'custom-mode', title: '自定义模式', stage: 'cleaning', operations: ['cleaning.start'], notes: [
     note('步骤与时长', '步骤默认不选。清洗 19–45 分钟、蒸汽 7–10 分钟、烘干 40–70 分钟、保管 10–72 小时。支持数字输入，超限提示并限制范围。至少选择一步才能启动或预约。', 'content'),
